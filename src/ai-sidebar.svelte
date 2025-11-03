@@ -384,15 +384,106 @@
         }
     }
 
-    // 格式化markdown（简单实现）
+    // 使用思源内置的Lute渲染markdown为HTML
     function formatMessage(content: string): string {
-        // 简单的markdown渲染（可以后续使用marked库增强）
-        return content
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
-            .replace(/\n/g, '<br>');
+        try {
+            // 检查window.Lute是否存在
+            if (typeof window !== 'undefined' && (window as any).Lute) {
+                const lute = (window as any).Lute.New();
+                // 使用Md2BlockDOM将markdown转换为HTML
+                const html = lute.Md2BlockDOM(content);
+                return html;
+            }
+            // 如果Lute不可用，回退到简单渲染
+            return content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
+                .replace(/\n/g, '<br>');
+        } catch (error) {
+            console.error('Format message error:', error);
+            return content;
+        }
+    }
+
+    // 高亮代码块
+    function highlightCodeBlocks(element: HTMLElement) {
+        if (!element) return;
+        
+        // 使用 tick 确保 DOM 已更新
+        tick().then(() => {
+            try {
+                if (typeof window === 'undefined' || !(window as any).hljs) {
+                    return;
+                }
+
+                const hljs = (window as any).hljs;
+                
+                // 处理思源的代码块结构: div.hljs > div[contenteditable]
+                const siyuanCodeBlocks = element.querySelectorAll('div.hljs > div[contenteditable="true"]');
+                siyuanCodeBlocks.forEach((block: HTMLElement) => {
+                    // 检查是否已经高亮过（通过检查是否有 hljs 的高亮 class）
+                    if (block.querySelector('.hljs-keyword, .hljs-string, .hljs-comment')) {
+                        return;
+                    }
+                    
+                    try {
+                        const code = block.textContent || '';
+                        const parent = block.parentElement as HTMLElement;
+                        
+                        // 尝试从父元素获取语言信息
+                        let language = '';
+                        const langAttr = parent.getAttribute('data-node-id') || parent.getAttribute('data-subtype');
+                        
+                        // 自动检测语言并高亮
+                        let highlighted;
+                        if (language) {
+                            highlighted = hljs.highlight(code, { language, ignoreIllegals: true });
+                        } else {
+                            highlighted = hljs.highlightAuto(code);
+                        }
+                        
+                        // 将高亮后的 HTML 设置到 contenteditable 元素中
+                        block.innerHTML = highlighted.value;
+                        
+                        // 标记已处理，添加一个自定义属性
+                        block.setAttribute('data-highlighted', 'true');
+                    } catch (error) {
+                        console.error('Highlight siyuan code block error:', error);
+                    }
+                });
+                
+                // 处理标准的 pre > code 结构（作为后备）
+                const standardCodeBlocks = element.querySelectorAll('pre > code:not([data-highlighted])');
+                standardCodeBlocks.forEach((block: HTMLElement) => {
+                    if (block.classList.contains('hljs') || block.getAttribute('data-highlighted')) {
+                        return;
+                    }
+                    
+                    try {
+                        hljs.highlightElement(block);
+                        block.setAttribute('data-highlighted', 'true');
+                    } catch (error) {
+                        console.error('Highlight standard code block error:', error);
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Highlight code blocks error:', error);
+            }
+        });
+    }
+
+    // 监听消息变化，高亮代码块
+    $: {
+        if (messages.length > 0 || streamingMessage) {
+            tick().then(() => {
+                if (messagesContainer) {
+                    highlightCodeBlocks(messagesContainer);
+                }
+            });
+        }
     }
 
     // 复制单条消息
@@ -903,7 +994,7 @@
                         <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
                     </button>
                 </div>
-                <div class="ai-message__content">
+                <div class="ai-message__content protyle-wysiwyg">
                     {@html formatMessage(message.content)}
                 </div>
             </div>
@@ -918,7 +1009,7 @@
                     <span class="ai-message__role">🤖 AI</span>
                     <span class="ai-message__streaming-indicator">●</span>
                 </div>
-                <div class="ai-message__content">
+                <div class="ai-message__content protyle-wysiwyg">
                     {@html formatMessage(streamingMessage)}
                 </div>
             </div>
@@ -1268,34 +1359,150 @@
         border-radius: 8px;
         line-height: 1.6;
         word-wrap: break-word;
+        overflow-x: auto;
 
-        :global(code) {
-            background: var(--b3-theme-surface);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: var(--b3-font-family-code);
-            font-size: 0.9em;
-        }
-
-        :global(pre) {
-            background: var(--b3-theme-surface);
-            padding: 12px;
-            border-radius: 6px;
-            overflow-x: auto;
-            margin: 8px 0;
-
-            :global(code) {
-                background: none;
-                padding: 0;
+        // 使用protyle-wysiwyg样式，支持思源的富文本渲染
+        &.protyle-wysiwyg {
+            // 重置一些可能冲突的样式
+            :global(p) {
+                margin: 0.5em 0;
+                
+                &:first-child {
+                    margin-top: 0;
+                }
+                
+                &:last-child {
+                    margin-bottom: 0;
+                }
             }
-        }
 
-        :global(strong) {
-            font-weight: 600;
-        }
+            // 思源代码块样式: div.hljs
+            :global(div.hljs) {
+                margin: 8px 0;
+                border-radius: 6px;
+                background: var(--b3-theme-surface);
+                overflow: hidden;
+                
+                // contenteditable 内的代码
+                :global(> div[contenteditable]) {
+                    padding: 12px;
+                    overflow-x: auto;
+                    font-family: var(--b3-font-family-code);
+                    font-size: 0.9em;
+                    line-height: 1.5;
+                    white-space: pre;
+                    color: var(--b3-theme-on-surface);
+                    
+                    // 禁用编辑（因为这是只读显示）
+                    pointer-events: none;
+                    user-select: text;
+                    
+                    // hljs 语法高亮的颜色会自动应用
+                    // 确保高亮类正确显示
+                    :global(.hljs-keyword),
+                    :global(.hljs-selector-tag),
+                    :global(.hljs-literal),
+                    :global(.hljs-section),
+                    :global(.hljs-link) {
+                        font-weight: normal;
+                    }
+                }
+            }
 
-        :global(em) {
-            font-style: italic;
+            // 标准代码块样式（后备）
+            :global(.code-block) {
+                margin: 8px 0;
+                border-radius: 6px;
+                overflow: hidden;
+            }
+
+            :global(pre) {
+                margin: 8px 0;
+                border-radius: 6px;
+                overflow-x: auto;
+                background: var(--b3-theme-surface);
+                padding: 12px;
+                
+                :global(code) {
+                    font-family: var(--b3-font-family-code);
+                    font-size: 0.9em;
+                    line-height: 1.5;
+                }
+            }
+
+            // 行内代码样式
+            :global(code:not(pre code):not(div.hljs code)) {
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.9em;
+                background: var(--b3-theme-surface);
+                font-family: var(--b3-font-family-code);
+            }
+
+            // 数学公式样式
+            :global(.katex-display) {
+                margin: 1em 0;
+                overflow-x: auto;
+            }
+
+            :global(.katex) {
+                font-size: 1em;
+            }
+
+            // 列表样式
+            :global(ul), :global(ol) {
+                margin: 0.5em 0;
+                padding-left: 2em;
+            }
+
+            // 标题样式
+            :global(h1), :global(h2), :global(h3), :global(h4), :global(h5), :global(h6) {
+                margin: 0.8em 0 0.4em;
+                font-weight: 600;
+                
+                &:first-child {
+                    margin-top: 0;
+                }
+            }
+
+            // 引用样式
+            :global(blockquote) {
+                margin: 0.5em 0;
+                padding-left: 1em;
+                border-left: 3px solid var(--b3-theme-primary);
+            }
+
+            // 表格样式
+            :global(table) {
+                margin: 0.5em 0;
+                border-collapse: collapse;
+                width: 100%;
+                overflow-x: auto;
+                display: block;
+            }
+
+            // 链接样式
+            :global(a) {
+                color: var(--b3-theme-primary);
+                text-decoration: none;
+                
+                &:hover {
+                    text-decoration: underline;
+                }
+            }
+
+            // 图片样式
+            :global(img) {
+                max-width: 100%;
+                height: auto;
+            }
+
+            // 分割线
+            :global(hr) {
+                margin: 1em 0;
+                border: none;
+                border-top: 1px solid var(--b3-border-color);
+            }
         }
     }
 
