@@ -998,10 +998,11 @@
             if (data && data.content) {
                 // 从块内容中提取前20个字作为显示标题
                 const contentPreview = data.content.replace(/\n/g, ' ').trim();
-                const displayTitle = contentPreview.length > 20 
-                    ? contentPreview.substring(0, 20) + '...' 
-                    : contentPreview || '块内容';
-                
+                const displayTitle =
+                    contentPreview.length > 20
+                        ? contentPreview.substring(0, 20) + '...'
+                        : contentPreview || '块内容';
+
                 contextDocuments = [
                     ...contextDocuments,
                     {
