@@ -1679,32 +1679,37 @@
         on:drop={handleDrop}
     >
         <div class="ai-sidebar__input-row">
-            <textarea
-                bind:this={textareaElement}
-                bind:value={currentInput}
-                on:keydown={handleKeydown}
-                on:paste={handlePaste}
-                placeholder="输入消息... (Ctrl+Enter 发送，可拖入文档、块或粘贴图片)"
-                class="ai-sidebar__input"
-                disabled={isLoading}
-                rows="1"
-            ></textarea>
-            <button
-                class="b3-button ai-sidebar__send-btn"
-                class:b3-button--primary={!isLoading}
-                class:ai-sidebar__send-btn--abort={isLoading}
-                on:click={isLoading ? abortMessage : sendMessage}
-                disabled={!isLoading && !currentInput.trim() && currentAttachments.length === 0}
-                title={isLoading ? '中断生成 (Ctrl+Enter)' : '发送消息 (Ctrl+Enter)'}
-            >
-                {#if isLoading}
-                    <svg class="b3-button__icon">
-                        <use xlink:href="#iconPause"></use>
-                    </svg>
-                {:else}
-                    <svg class="b3-button__icon"><use xlink:href="#iconUp"></use></svg>
-                {/if}
-            </button>
+            <div class="ai-sidebar__input-wrapper">
+                <textarea
+                    bind:this={textareaElement}
+                    bind:value={currentInput}
+                    on:keydown={handleKeydown}
+                    on:paste={handlePaste}
+                    placeholder="输入消息... (Ctrl+Enter 发送，可拖入文档、块或粘贴图片)"
+                    class="ai-sidebar__input"
+                    disabled={isLoading}
+                    rows="1"
+                ></textarea>
+
+                <!-- 覆盖在输入框内的发送按钮 -->
+                <button
+                    class="b3-button ai-sidebar__send-btn"
+                    class:b3-button--primary={!isLoading}
+                    class:ai-sidebar__send-btn--abort={isLoading}
+                    on:click={isLoading ? abortMessage : sendMessage}
+                    disabled={!isLoading && !currentInput.trim() && currentAttachments.length === 0}
+                    title={isLoading ? '中断生成 (Ctrl+Enter)' : '发送消息 (Ctrl+Enter)'}
+                    aria-label={isLoading ? '中断生成' : '发送消息'}
+                >
+                    {#if isLoading}
+                        <svg class="b3-button__icon">
+                            <use xlink:href="#iconPause"></use>
+                        </svg>
+                    {:else}
+                        <svg class="b3-button__icon"><use xlink:href="#iconUp"></use></svg>
+                    {/if}
+                </button>
+            </div>
         </div>
 
         <!-- 隐藏的文件上传 input -->
@@ -2436,7 +2441,8 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
-        padding: 12px 16px;
+        /* 缩小 padding，外观更紧凑 */
+        padding: 8px 12px;
         border-top: 1px solid var(--b3-border-color);
         background: var(--b3-theme-background);
         flex-shrink: 0;
@@ -2447,6 +2453,7 @@
     .ai-sidebar__input-row {
         display: flex;
         gap: 8px;
+        position: relative; /* 使发送按钮能绝对定位到输入框内 */
     }
 
     .ai-sidebar__input {
@@ -2454,7 +2461,9 @@
         resize: none;
         border: 1px solid var(--b3-border-color);
         border-radius: 6px;
-        padding: 10px 12px;
+        /* 减小内边距并为右侧发送按钮留出空间 */
+        padding: 8px 12px 8px 10px;
+        padding-right: 48px;
         font-family: var(--b3-font-family);
         font-size: 14px;
         line-height: 1.5;
@@ -2668,9 +2677,16 @@
     }
 
     .ai-sidebar__send-btn {
-        align-self: flex-end;
-        min-width: 40px;
-        height: 40px;
+        /* 覆盖在输入框内右侧 */
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 3;
+        min-width: 36px;
+        height: 32px;
+        padding: 6px 8px;
+        border-radius: 6px;
         flex-shrink: 0;
 
         &:disabled {
