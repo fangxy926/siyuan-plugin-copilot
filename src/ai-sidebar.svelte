@@ -910,11 +910,7 @@
             {/if}
         </h3>
         <div class="ai-sidebar__actions">
-            <button
-                class="b3-button b3-button--text"
-                on:click={newSession}
-                title="新建对话"
-            >
+            <button class="b3-button b3-button--text" on:click={newSession} title="新建对话">
                 <svg class="b3-button__icon"><use xlink:href="#iconAdd"></use></svg>
             </button>
             <SessionManager
