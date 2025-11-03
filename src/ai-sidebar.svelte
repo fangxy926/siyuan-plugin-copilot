@@ -3,10 +3,20 @@
     import { chat, estimateTokens, calculateTotalTokens, type Message } from './ai-chat';
     import { pushMsg, pushErrMsg } from './api';
     import ModelSelector from './components/ModelSelector.svelte';
+    import SessionManager from './components/SessionManager.svelte';
     import type { ProviderConfig } from './defaultSettings';
     import { settingsStore } from './stores/settings';
+    import { confirm } from 'siyuan';
 
     export let plugin: any;
+
+    interface ChatSession {
+        id: string;
+        title: string;
+        messages: Message[];
+        createdAt: number;
+        updatedAt: number;
+    }
 
     let messages: Message[] = [];
     let currentInput = '';
@@ -15,6 +25,12 @@
     let settings: any = {};
     let messagesContainer: HTMLElement;
     let textareaElement: HTMLTextAreaElement;
+
+    // 会话管理
+    let sessions: ChatSession[] = [];
+    let currentSessionId: string = '';
+    let isSessionManagerOpen = false;
+    let hasUnsavedChanges = false;
 
     // Token统计
     let totalTokens = 0;
@@ -39,6 +55,9 @@
         currentProvider = settings.currentProvider || '';
         currentModelId = settings.currentModelId || '';
 
+        // 加载历史会话
+        await loadSessions();
+
         // 如果有系统提示词，添加到消息列表
         if (settings.aiSystemPrompt) {
             messages = [{ role: 'system', content: settings.aiSystemPrompt }];
@@ -46,7 +65,7 @@
         updateTokenCount();
 
         // 订阅设置变化
-        unsubscribe = settingsStore.subscribe((newSettings) => {
+        unsubscribe = settingsStore.subscribe(newSettings => {
             if (newSettings && Object.keys(newSettings).length > 0) {
                 // 更新本地设置
                 settings = newSettings;
@@ -228,6 +247,7 @@
         currentInput = '';
         isLoading = true;
         streamingMessage = '';
+        hasUnsavedChanges = true;
 
         await scrollToBottom();
 
@@ -259,6 +279,7 @@
                         messages = [...messages, assistantMessage];
                         streamingMessage = '';
                         isLoading = false;
+                        hasUnsavedChanges = true;
                         updateTokenCount();
                     },
                     onError: (error: Error) => {
@@ -299,10 +320,22 @@
 
     // 清空对话
     function clearChat() {
+        if (hasUnsavedChanges && messages.filter(m => m.role !== 'system').length > 0) {
+            confirm('清空对话', '当前会话有未保存的更改，确定要清空吗？', () => {
+                doClearChat();
+            });
+        } else {
+            doClearChat();
+        }
+    }
+
+    function doClearChat() {
         messages = settings.aiSystemPrompt
             ? [{ role: 'system', content: settings.aiSystemPrompt }]
             : [];
         streamingMessage = '';
+        currentSessionId = '';
+        hasUnsavedChanges = false;
         updateTokenCount();
         pushMsg('对话已清空');
     }
@@ -325,19 +358,189 @@
             .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
             .replace(/\n/g, '<br>');
     }
+
+    // 复制单条消息
+    function copyMessage(content: string, role: string) {
+        const roleText = role === 'user' ? '👤 **User**' : '🤖 **Assistant**';
+        const markdown = `${roleText}\n\n${content}`;
+
+        navigator.clipboard
+            .writeText(markdown)
+            .then(() => {
+                pushMsg('消息已复制');
+            })
+            .catch(err => {
+                pushErrMsg('复制失败');
+                console.error('Copy failed:', err);
+            });
+    }
+
+    // 会话管理函数
+    async function loadSessions() {
+        try {
+            const data = await plugin.loadData('chat-sessions.json');
+            sessions = data?.sessions || [];
+        } catch (error) {
+            console.error('Load sessions error:', error);
+            sessions = [];
+        }
+    }
+
+    async function saveSessions() {
+        try {
+            await plugin.saveData('chat-sessions.json', { sessions });
+        } catch (error) {
+            console.error('Save sessions error:', error);
+            pushErrMsg('保存会话失败');
+        }
+    }
+
+    function generateSessionTitle(): string {
+        const userMessages = messages.filter(m => m.role === 'user');
+        if (userMessages.length > 0) {
+            const firstMessage = userMessages[0].content;
+            return firstMessage.length > 30 ? firstMessage.substring(0, 30) + '...' : firstMessage;
+        }
+        return '新对话';
+    }
+
+    async function saveCurrentSession() {
+        if (messages.filter(m => m.role !== 'system').length === 0) {
+            pushErrMsg('当前会话为空，无需保存');
+            return;
+        }
+
+        const now = Date.now();
+
+        if (currentSessionId) {
+            // 更新现有会话
+            const session = sessions.find(s => s.id === currentSessionId);
+            if (session) {
+                session.messages = [...messages];
+                session.title = generateSessionTitle();
+                session.updatedAt = now;
+            }
+        } else {
+            // 创建新会话
+            const newSession: ChatSession = {
+                id: `session_${now}`,
+                title: generateSessionTitle(),
+                messages: [...messages],
+                createdAt: now,
+                updatedAt: now,
+            };
+            sessions = [newSession, ...sessions];
+            currentSessionId = newSession.id;
+        }
+
+        await saveSessions();
+        hasUnsavedChanges = false;
+        pushMsg('会话已保存');
+    }
+
+    async function loadSession(sessionId: string) {
+        if (hasUnsavedChanges) {
+            confirm(
+                '切换会话',
+                '当前会话有未保存的更改，是否保存？',
+                async () => {
+                    await saveCurrentSession();
+                    await doLoadSession(sessionId);
+                },
+                async () => {
+                    await doLoadSession(sessionId);
+                }
+            );
+        } else {
+            await doLoadSession(sessionId);
+        }
+    }
+
+    async function doLoadSession(sessionId: string) {
+        const session = sessions.find(s => s.id === sessionId);
+        if (session) {
+            messages = [...session.messages];
+            // 确保系统提示词存在且是最新的
+            if (settings.aiSystemPrompt) {
+                const systemMsgIndex = messages.findIndex(m => m.role === 'system');
+                if (systemMsgIndex >= 0) {
+                    messages[systemMsgIndex].content = settings.aiSystemPrompt;
+                } else {
+                    messages.unshift({ role: 'system', content: settings.aiSystemPrompt });
+                }
+            }
+            currentSessionId = sessionId;
+            hasUnsavedChanges = false;
+            updateTokenCount();
+            await scrollToBottom();
+            pushMsg(`已加载会话: ${session.title}`);
+        }
+    }
+
+    async function newSession() {
+        // 如果有未保存的更改，自动保存当前会话
+        if (hasUnsavedChanges && messages.filter(m => m.role !== 'system').length > 0) {
+            await saveCurrentSession();
+        }
+        doNewSession();
+    }
+
+    function doNewSession() {
+        messages = settings.aiSystemPrompt
+            ? [{ role: 'system', content: settings.aiSystemPrompt }]
+            : [];
+        currentSessionId = '';
+        hasUnsavedChanges = false;
+        updateTokenCount();
+        pushMsg('已创建新会话');
+    }
+
+    async function deleteSession(sessionId: string) {
+        confirm('删除会话', '确定要删除这个会话吗？此操作无法撤销。', async () => {
+            sessions = sessions.filter(s => s.id !== sessionId);
+            await saveSessions();
+
+            if (currentSessionId === sessionId) {
+                doNewSession();
+            }
+
+            pushMsg('会话已删除');
+        });
+    }
 </script>
 
 <div class="ai-sidebar">
     <div class="ai-sidebar__header">
-        <h3 class="ai-sidebar__title">AI 助手</h3>
+        <h3 class="ai-sidebar__title">
+            AI 助手
+            {#if hasUnsavedChanges}
+                <span class="ai-sidebar__unsaved" title="有未保存的更改">●</span>
+            {/if}
+        </h3>
         <div class="ai-sidebar__actions">
             <span class="ai-sidebar__token-count" title="当前对话token数 / 输入框token数">
                 💬 {totalTokens} / ✏️ {inputTokens}
             </span>
             <button
                 class="b3-button b3-button--text"
+                on:click={saveCurrentSession}
+                title="保存当前会话"
+                disabled={!hasUnsavedChanges}
+            >
+                <svg class="b3-button__icon"><use xlink:href="#iconSave"></use></svg>
+            </button>
+            <SessionManager
+                bind:sessions
+                bind:currentSessionId
+                bind:isOpen={isSessionManagerOpen}
+                on:load={e => loadSession(e.detail.sessionId)}
+                on:delete={e => deleteSession(e.detail.sessionId)}
+                on:new={newSession}
+            />
+            <button
+                class="b3-button b3-button--text"
                 on:click={copyAsMarkdown}
-                title="复制为Markdown"
+                title="复制全部对话"
             >
                 <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
             </button>
@@ -354,6 +557,13 @@
                     <span class="ai-message__role">
                         {message.role === 'user' ? '👤 You' : '🤖 AI'}
                     </span>
+                    <button
+                        class="b3-button b3-button--text ai-message__copy"
+                        on:click={() => copyMessage(message.content, message.role)}
+                        title="复制这条消息"
+                    >
+                        <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                    </button>
                 </div>
                 <div class="ai-message__content">
                     {@html formatMessage(message.content)}
@@ -442,6 +652,15 @@
         font-size: 16px;
         font-weight: 600;
         color: var(--b3-theme-on-background);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .ai-sidebar__unsaved {
+        color: var(--b3-theme-primary);
+        font-size: 12px;
+        animation: pulse 2s ease-in-out infinite;
     }
 
     .ai-sidebar__actions {
@@ -510,6 +729,7 @@
     .ai-message__header {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 8px;
     }
 
@@ -517,6 +737,16 @@
         font-size: 12px;
         font-weight: 600;
         color: var(--b3-theme-on-surface);
+    }
+
+    .ai-message__copy {
+        opacity: 0;
+        transition: opacity 0.2s;
+        flex-shrink: 0;
+    }
+
+    .ai-message:hover .ai-message__copy {
+        opacity: 1;
     }
 
     .ai-message__streaming-indicator {
