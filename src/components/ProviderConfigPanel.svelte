@@ -620,7 +620,8 @@
     .api-preview__url {
         margin-top: 4px;
         color: var(--b3-theme-on-surface);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Segoe UI Mono", monospace;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Segoe UI Mono',
+            monospace;
         font-size: 13px;
     }
 
