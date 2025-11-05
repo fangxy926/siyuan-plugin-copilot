@@ -161,7 +161,7 @@
         document.addEventListener('click', handleClickOutside);
     });
 
-    onDestroy(() => {
+    onDestroy(async () => {
         // 取消订阅
         if (unsubscribe) {
             unsubscribe();
@@ -169,6 +169,11 @@
 
         // 移除全局点击事件监听器
         document.removeEventListener('click', handleClickOutside);
+
+        // 如果有未保存的更改，自动保存当前会话
+        if (hasUnsavedChanges && messages.filter(m => m.role !== 'system').length > 0) {
+            await saveCurrentSession(true); // 静默保存，不显示提示
+        }
     });
 
     // 迁移旧设置到新结构
@@ -632,7 +637,7 @@
                         streamingMessage += chunk;
                         await scrollToBottom();
                     },
-                    onComplete: (fullText: string) => {
+                    onComplete: async (fullText: string) => {
                         // 转换 LaTeX 数学公式格式为 Markdown 格式
                         const convertedText = convertLatexToMarkdown(fullText);
 
@@ -653,6 +658,9 @@
                         isLoading = false;
                         abortController = null;
                         hasUnsavedChanges = true;
+
+                        // AI 回复完成后，自动保存当前会话
+                        await saveCurrentSession(true);
                     },
                     onError: (error: Error) => {
                         // 如果是主动中断，不显示错误
@@ -1445,9 +1453,11 @@
         return t('aiSidebar.session.new');
     }
 
-    async function saveCurrentSession() {
+    async function saveCurrentSession(silent: boolean = false) {
         if (messages.filter(m => m.role !== 'system').length === 0) {
-            pushErrMsg(t('aiSidebar.errors.emptySession'));
+            if (!silent) {
+                pushErrMsg(t('aiSidebar.errors.emptySession'));
+            }
             return;
         }
 
@@ -1458,7 +1468,8 @@
             const session = sessions.find(s => s.id === currentSessionId);
             if (session) {
                 session.messages = [...messages];
-                session.contextDocuments = contextDocuments.length > 0 ? [...contextDocuments] : undefined;
+                session.contextDocuments =
+                    contextDocuments.length > 0 ? [...contextDocuments] : undefined;
                 session.title = generateSessionTitle();
                 session.updatedAt = now;
             }
@@ -1478,6 +1489,10 @@
 
         await saveSessions();
         hasUnsavedChanges = false;
+        
+        if (!silent) {
+            pushMsg(t('aiSidebar.success.saveSessionSuccess'));
+        }
     }
 
     async function loadSession(sessionId: string) {
@@ -1894,7 +1909,7 @@
                         streamingMessage += chunk;
                         await scrollToBottom();
                     },
-                    onComplete: (fullText: string) => {
+                    onComplete: async (fullText: string) => {
                         // 转换 LaTeX 数学公式格式为 Markdown 格式
                         const convertedText = convertLatexToMarkdown(fullText);
 
@@ -1914,6 +1929,9 @@
                         isLoading = false;
                         abortController = null;
                         hasUnsavedChanges = true;
+
+                        // AI 回复完成后，自动保存当前会话
+                        await saveCurrentSession(true);
                     },
                     onError: (error: Error) => {
                         if (error.message !== 'Request aborted') {
@@ -2087,9 +2105,7 @@
                     <!-- 显示模式 -->
                     <div
                         class="ai-message__content protyle-wysiwyg"
-                        style={messageFontSize
-                            ? `font-size: ${messageFontSize}px;`
-                            : ''}
+                        style={messageFontSize ? `font-size: ${messageFontSize}px;` : ''}
                     >
                         {@html formatMessage(message.content)}
                     </div>
@@ -2173,9 +2189,7 @@
                 {#if streamingMessage}
                     <div
                         class="ai-message__content protyle-wysiwyg"
-                        style={messageFontSize
-                            ? `font-size: ${messageFontSize}px;`
-                            : ''}
+                        style={messageFontSize ? `font-size: ${messageFontSize}px;` : ''}
                     >
                         {@html formatMessage(streamingMessage)}
                     </div>

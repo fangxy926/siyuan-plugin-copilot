@@ -219,7 +219,8 @@
             "documentExists": "Document already in context",
             "blockExists": "This content is already in context",
             "addPromptSuccess": "Custom platform added",
-            "deletePromptSuccess": "Platform deleted"
+            "deletePromptSuccess": "Platform deleted",
+            "saveSessionSuccess": "Session saved"
         },
         "confirm": {
             "clearChat": {

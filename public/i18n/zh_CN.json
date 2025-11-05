@@ -218,7 +218,8 @@
             "documentExists": "该文档已在上下文中",
             "blockExists": "该内容已在上下文中",
             "addPromptSuccess": "已添加自定义平台",
-            "deletePromptSuccess": "已删除平台"
+            "deletePromptSuccess": "已删除平台",
+            "saveSessionSuccess": "会话已保存"
         },
         "confirm": {
             "clearChat": {
