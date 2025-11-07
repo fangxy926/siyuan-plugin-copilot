@@ -22,6 +22,7 @@
         getBlockDOM,
         getBlockKramdown,
         getBlockByID,
+        getFileBlob,
     } from './api';
     import ModelSelector from './components/ModelSelector.svelte';
     import SessionManager from './components/SessionManager.svelte';
@@ -2144,15 +2145,14 @@
                     const imageName = match[1] || '图片'; // 图片名称
 
                     try {
-                        // 从路径中提取实际的文件路径
+                        // 使用思源 API 获取图片文件
                         // 思源笔记的图片路径格式：assets/xxx-xxxxx.png
-                        const fullPath = `/data/${imagePath}`;
-
-                        // 使用 fetch 获取图片数据
-                        const response = await fetch(fullPath);
-                        if (response.ok) {
-                            const blob = await response.blob();
-                            const file = new File([blob], imageName, { type: blob.type });
+                        const blob = await getFileBlob(`/data/${imagePath}`);
+                        
+                        if (blob) {
+                            // 从文件路径提取文件名作为默认名称
+                            const fileName = imagePath.split('/').pop() || 'image.png';
+                            const file = new File([blob], imageName || fileName, { type: blob.type });
 
                             // 将图片转换为 base64 并添加为附件
                             const base64 = await fileToBase64(file);
@@ -2161,9 +2161,9 @@
                                 ...currentAttachments,
                                 {
                                     type: 'image',
-                                    name: imageName,
+                                    name: imageName || fileName,
                                     data: base64,
-                                    mimeType: blob.type,
+                                    mimeType: blob.type || 'image/png',
                                 },
                             ];
 
