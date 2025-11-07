@@ -108,7 +108,7 @@
         }
     },
     "aiSidebar": {
-        "title": "SiYuan Copilot",
+        "title": "Copilot",
         "unsaved": "Unsaved",
         "unsavedChanges": "Unsaved changes",
         "mode": {
@@ -438,5 +438,26 @@
         "waitingApproval": "Waiting for Approval",
         "approve": "Approve",
         "reject": "Reject"
+    },
+    "multiModel": {
+        "title": "Multi-Model Chat",
+        "enabled": "Multi-Model",
+        "enable": "Enable Multi-Model",
+        "selectModels": "Select Multiple Models",
+        "selectAll": "Select All",
+        "deselectAll": "Deselect All",
+        "selected": "Selected",
+        "noModels": "No available models",
+        "responses": "Model Responses",
+        "selectAnswer": "Select This Answer",
+        "answerSelected": "Selected",
+        "waitingSelection": "Please select a satisfactory answer before continuing the conversation",
+        "loading": "Generating...",
+        "error": "Generation failed",
+        "thinking": "Thinking...",
+        "layout": {
+            "card": "Card View",
+            "tab": "Tab View"
+        }
     }
 }

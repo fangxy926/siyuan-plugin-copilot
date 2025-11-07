@@ -107,7 +107,7 @@
         }
     },
     "aiSidebar": {
-        "title": "SiYuan Copilot",
+        "title": "Copilot",
         "unsaved": "未保存",
         "unsavedChanges": "有未保存的更改",
         "mode": {
@@ -437,5 +437,26 @@
         "waitingApproval": "等待批准",
         "approve": "批准",
         "reject": "拒绝"
+    },
+    "multiModel": {
+        "title": "多模型对话",
+        "enabled": "多模型",
+        "enable": "启用多模型",
+        "selectModels": "选择多个模型",
+        "selectAll": "全选",
+        "deselectAll": "取消全选",
+        "selected": "已选择",
+        "noModels": "暂无可用模型",
+        "responses": "模型回答",
+        "selectAnswer": "选择此答案",
+        "answerSelected": "已选择",
+        "waitingSelection": "请选择一个满意的答案后再继续对话",
+        "loading": "正在生成...",
+        "error": "生成失败",
+        "thinking": "思考中...",
+        "layout": {
+            "card": "卡片视图",
+            "tab": "页签视图"
+        }
     }
 }

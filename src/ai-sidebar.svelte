@@ -25,6 +25,7 @@
         getFileBlob,
     } from './api';
     import ModelSelector from './components/ModelSelector.svelte';
+    import MultiModelSelector from './components/MultiModelSelector.svelte';
     import SessionManager from './components/SessionManager.svelte';
     import ToolSelector, { type ToolConfig } from './components/ToolSelector.svelte';
     import type { ProviderConfig } from './defaultSettings';
@@ -139,6 +140,23 @@
     let isToolApprovalDialogOpen = false; // 工具批准对话框是否打开
     let isToolConfigLoaded = false; // 标记工具配置是否已加载
 
+    // 多模型对话
+    let enableMultiModel = false; // 是否启用多模型模式
+    let selectedMultiModels: Array<{ provider: string; modelId: string }> = []; // 选中的多个模型
+    let multiModelResponses: Array<{
+        provider: string;
+        modelId: string;
+        modelName: string;
+        content: string;
+        thinking?: string;
+        isLoading: boolean;
+        error?: string;
+    }> = []; // 多模型响应
+    let isWaitingForAnswerSelection = false; // 是否在等待用户选择答案
+    let selectedAnswerIndex: number | null = null; // 用户选择的答案索引
+    let multiModelLayout: 'card' | 'tab' = 'tab'; // 多模型布局模式：card 或 tab
+    let selectedTabIndex: number = 0; // 当前选中的页签索引
+
     // 订阅设置变化
     let unsubscribe: () => void;
 
@@ -152,6 +170,9 @@
         providers = settings.aiProviders || {};
         currentProvider = settings.currentProvider || '';
         currentModelId = settings.currentModelId || '';
+
+        // 初始化多模型选择
+        selectedMultiModels = settings.selectedMultiModels || [];
 
         // 初始化字体大小设置
         messageFontSize = settings.messageFontSize || 12;
@@ -199,12 +220,15 @@
                     currentModelId = newSettings.currentModelId;
                 }
 
+                // 更新多模型选择
+                if (newSettings.selectedMultiModels !== undefined) {
+                    selectedMultiModels = newSettings.selectedMultiModels;
+                }
+
                 // 实时更新字体大小设置
                 if (newSettings.messageFontSize !== undefined) {
                     messageFontSize = newSettings.messageFontSize;
-                }
-
-                // 更新系统提示词
+                } // 更新系统提示词
                 if (settings.aiSystemPrompt && messages.length === 0) {
                     messages = [{ role: 'system', content: settings.aiSystemPrompt }];
                 } else if (settings.aiSystemPrompt && messages[0]?.role === 'system') {
@@ -504,6 +528,29 @@
         plugin.saveSettings(settings);
     }
 
+    // 处理多模型选择变化
+    function handleMultiModelChange(
+        event: CustomEvent<Array<{ provider: string; modelId: string }>>
+    ) {
+        selectedMultiModels = event.detail;
+
+        // 保存到设置中
+        settings.selectedMultiModels = event.detail;
+        plugin.saveSettings(settings);
+    }
+
+    // 处理多模型开关切换
+    function handleToggleMultiModel(event: CustomEvent<boolean>) {
+        enableMultiModel = event.detail;
+
+        // 如果禁用多模型，清除相关状态
+        if (!enableMultiModel) {
+            multiModelResponses = [];
+            isWaitingForAnswerSelection = false;
+            selectedAnswerIndex = null;
+        }
+    }
+
     // 获取当前提供商配置
     function getCurrentProviderConfig() {
         if (!currentProvider) return null;
@@ -530,9 +577,369 @@
         return providerConfig.models.find((m: any) => m.id === currentModelId);
     }
 
+    // 获取指定提供商和模型的配置
+    function getProviderAndModelConfig(provider: string, modelId: string) {
+        let providerConfig: any = null;
+
+        // 检查是否是内置平台
+        if (providers[provider] && !Array.isArray(providers[provider])) {
+            providerConfig = providers[provider];
+        } else if (providers.customProviders && Array.isArray(providers.customProviders)) {
+            // 检查是否是自定义平台
+            providerConfig = providers.customProviders.find((p: any) => p.id === provider);
+        }
+
+        if (!providerConfig) return null;
+
+        const modelConfig = providerConfig.models.find((m: any) => m.id === modelId);
+        return { providerConfig, modelConfig };
+    }
+
+    // 多模型发送消息
+    async function sendMultiModelMessage() {
+        // 保存用户输入和附件
+        const userContent = currentInput.trim();
+        const userAttachments = [...currentAttachments];
+        const userContextDocuments = [...contextDocuments];
+
+        // 获取所有上下文文档的最新内容
+        const contextDocumentsWithLatestContent: ContextDocument[] = [];
+        if (userContextDocuments.length > 0) {
+            for (const doc of userContextDocuments) {
+                try {
+                    const data = await exportMdContent(doc.id, false, false, 2, 0, false);
+                    if (data && data.content) {
+                        contextDocumentsWithLatestContent.push({
+                            id: doc.id,
+                            title: doc.title,
+                            content: data.content,
+                            type: doc.type,
+                        });
+                    } else {
+                        contextDocumentsWithLatestContent.push(doc);
+                    }
+                } catch (error) {
+                    console.error(`Failed to get latest content for block ${doc.id}:`, error);
+                    contextDocumentsWithLatestContent.push(doc);
+                }
+            }
+        }
+
+        // 创建用户消息
+        const userMessage: Message = {
+            role: 'user',
+            content: userContent,
+            attachments: userAttachments.length > 0 ? userAttachments : undefined,
+            contextDocuments:
+                contextDocumentsWithLatestContent.length > 0
+                    ? contextDocumentsWithLatestContent
+                    : undefined,
+        };
+
+        messages = [...messages, userMessage];
+        currentInput = '';
+        currentAttachments = [];
+        contextDocuments = [];
+        isLoading = true;
+        isWaitingForAnswerSelection = true;
+        hasUnsavedChanges = true;
+        autoScroll = true;
+
+        await scrollToBottom(true);
+
+        // 准备消息数组（包含上下文）
+        const messagesToSend = prepareMessagesForAI(
+            messages,
+            contextDocumentsWithLatestContent,
+            userContent,
+            userMessage
+        );
+
+        // 初始化多模型响应数组
+        multiModelResponses = selectedMultiModels.map(model => {
+            const config = getProviderAndModelConfig(model.provider, model.modelId);
+            return {
+                provider: model.provider,
+                modelId: model.modelId,
+                modelName: config?.modelConfig?.name || model.modelId,
+                content: '',
+                thinking: '',
+                isLoading: true,
+            };
+        });
+
+        // 并发请求所有模型
+        const promises = selectedMultiModels.map(async (model, index) => {
+            const config = getProviderAndModelConfig(model.provider, model.modelId);
+            if (!config) return;
+
+            const { providerConfig, modelConfig } = config;
+            if (!providerConfig.apiKey) return;
+
+            try {
+                let fullText = '';
+                let thinking = '';
+
+                await chat(
+                    model.provider,
+                    {
+                        apiKey: providerConfig.apiKey,
+                        model: modelConfig.id,
+                        messages: messagesToSend,
+                        temperature: modelConfig.temperature,
+                        maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
+                        stream: true,
+                        enableThinking: modelConfig.capabilities?.thinking || false,
+                        onThinkingChunk: async (chunk: string) => {
+                            thinking += chunk;
+                            multiModelResponses[index].thinking = thinking;
+                            multiModelResponses = [...multiModelResponses];
+                        },
+                        onChunk: async (chunk: string) => {
+                            fullText += chunk;
+                            multiModelResponses[index].content = fullText;
+                            multiModelResponses = [...multiModelResponses];
+                        },
+                        onComplete: async (text: string) => {
+                            multiModelResponses[index].content = convertLatexToMarkdown(text);
+                            multiModelResponses[index].thinking = thinking;
+                            multiModelResponses[index].isLoading = false;
+                            multiModelResponses = [...multiModelResponses];
+                        },
+                        onError: (error: Error) => {
+                            multiModelResponses[index].error = error.message;
+                            multiModelResponses[index].isLoading = false;
+                            multiModelResponses = [...multiModelResponses];
+                        },
+                    },
+                    providerConfig.customApiUrl
+                );
+            } catch (error) {
+                multiModelResponses[index].error = (error as Error).message;
+                multiModelResponses[index].isLoading = false;
+                multiModelResponses = [...multiModelResponses];
+            }
+        });
+
+        // 等待所有请求完成
+        await Promise.all(promises);
+        isLoading = false;
+    }
+
+    // 准备发送给AI的消息（提取为独立函数以便复用）
+    function prepareMessagesForAI(
+        messages: Message[],
+        contextDocumentsWithLatestContent: ContextDocument[],
+        userContent: string,
+        lastUserMessage: Message
+    ) {
+        let messagesToSend = messages
+            .filter(msg => msg.role !== 'system')
+            .map((msg, index, array) => {
+                const baseMsg: any = {
+                    role: msg.role,
+                    content: msg.content,
+                };
+
+                const isLastMessage = index === array.length - 1;
+                if (
+                    !isLastMessage &&
+                    msg.role === 'user' &&
+                    msg.contextDocuments &&
+                    msg.contextDocuments.length > 0
+                ) {
+                    const hasImages = msg.attachments?.some(att => att.type === 'image');
+                    const originalContent =
+                        typeof msg.content === 'string' ? msg.content : getMessageText(msg.content);
+
+                    const contextText = msg.contextDocuments
+                        .map(doc => {
+                            const label = doc.type === 'doc' ? '文档' : '块';
+                            return `## ${label}: ${doc.title}\n\n**BlockID**: \`${doc.id}\`\n\n\`\`\`markdown\n${doc.content}\n\`\`\``;
+                        })
+                        .join('\n\n---\n\n');
+
+                    if (hasImages) {
+                        const contentParts: any[] = [];
+                        let textContent = originalContent;
+                        textContent += `\n\n---\n\n以下是相关内容作为上下文：\n\n${contextText}`;
+                        contentParts.push({ type: 'text', text: textContent });
+
+                        msg.attachments?.forEach(att => {
+                            if (att.type === 'image') {
+                                contentParts.push({
+                                    type: 'image_url',
+                                    image_url: { url: att.data },
+                                });
+                            }
+                        });
+
+                        const fileTexts = msg.attachments
+                            ?.filter(att => att.type === 'file')
+                            .map(att => `## 文件: ${att.name}\n\n\`\`\`\n${att.data}\n\`\`\`\n`)
+                            .join('\n\n---\n\n');
+
+                        if (fileTexts) {
+                            contentParts.push({
+                                type: 'text',
+                                text: `\n\n以下是附件文件内容：\n\n${fileTexts}`,
+                            });
+                        }
+
+                        baseMsg.content = contentParts;
+                    } else {
+                        let enhancedContent = originalContent;
+
+                        if (msg.attachments && msg.attachments.length > 0) {
+                            const attachmentTexts = msg.attachments
+                                .map(att => {
+                                    if (att.type === 'file') {
+                                        return `## 文件: ${att.name}\n\n\`\`\`\n${att.data}\n\`\`\`\n`;
+                                    }
+                                    return '';
+                                })
+                                .filter(Boolean)
+                                .join('\n\n---\n\n');
+
+                            if (attachmentTexts) {
+                                enhancedContent += `\n\n---\n\n以下是附件内容：\n\n${attachmentTexts}`;
+                            }
+                        }
+
+                        enhancedContent += `\n\n---\n\n以下是相关内容作为上下文：\n\n${contextText}`;
+                        baseMsg.content = enhancedContent;
+                    }
+                }
+
+                return baseMsg;
+            });
+
+        // 处理最后一条用户消息
+        if (messagesToSend.length > 0) {
+            const lastMessage = messagesToSend[messagesToSend.length - 1];
+            if (lastMessage.role === 'user') {
+                const hasImages = lastUserMessage.attachments?.some(att => att.type === 'image');
+
+                if (hasImages) {
+                    const contentParts: any[] = [];
+                    let textContent = userContent;
+
+                    if (contextDocumentsWithLatestContent.length > 0) {
+                        const contextText = contextDocumentsWithLatestContent
+                            .map(doc => {
+                                const label = doc.type === 'doc' ? '文档' : '块';
+                                return `## ${label}: ${doc.title}\n\n**BlockID**: \`${doc.id}\`\n\n\`\`\`markdown\n${doc.content}\n\`\`\``;
+                            })
+                            .join('\n\n---\n\n');
+                        textContent += `\n\n---\n\n以下是相关内容作为上下文：\n\n${contextText}`;
+                    }
+
+                    contentParts.push({ type: 'text', text: textContent });
+
+                    lastUserMessage.attachments?.forEach(att => {
+                        if (att.type === 'image') {
+                            contentParts.push({
+                                type: 'image_url',
+                                image_url: { url: att.data },
+                            });
+                        }
+                    });
+
+                    const fileTexts = lastUserMessage.attachments
+                        ?.filter(att => att.type === 'file')
+                        .map(att => `## 文件: ${att.name}\n\n\`\`\`\n${att.data}\n\`\`\`\n`)
+                        .join('\n\n---\n\n');
+
+                    if (fileTexts) {
+                        contentParts.push({
+                            type: 'text',
+                            text: `\n\n以下是附件文件内容：\n\n${fileTexts}`,
+                        });
+                    }
+
+                    lastMessage.content = contentParts;
+                } else {
+                    let enhancedContent = userContent;
+
+                    if (lastUserMessage.attachments && lastUserMessage.attachments.length > 0) {
+                        const attachmentTexts = lastUserMessage.attachments
+                            .map(att => {
+                                if (att.type === 'file') {
+                                    return `## 文件: ${att.name}\n\n\`\`\`\n${att.data}\n\`\`\`\n`;
+                                }
+                                return '';
+                            })
+                            .filter(Boolean)
+                            .join('\n\n---\n\n');
+
+                        if (attachmentTexts) {
+                            enhancedContent += `\n\n---\n\n以下是附件内容：\n\n${attachmentTexts}`;
+                        }
+                    }
+
+                    if (contextDocumentsWithLatestContent.length > 0) {
+                        const contextText = contextDocumentsWithLatestContent
+                            .map(doc => {
+                                const label = doc.type === 'doc' ? '文档' : '块';
+                                return `## ${label}: ${doc.title}\n\n**BlockID**: \`${doc.id}\`\n\n\`\`\`markdown\n${doc.content}\n\`\`\``;
+                            })
+                            .join('\n\n---\n\n');
+                        enhancedContent += `\n\n---\n\n以下是相关内容作为上下文：\n\n${contextText}`;
+                    }
+
+                    lastMessage.content = enhancedContent;
+                }
+            }
+        }
+
+        // 添加系统提示词
+        if (settings.aiSystemPrompt) {
+            messagesToSend.unshift({ role: 'system', content: settings.aiSystemPrompt });
+        }
+
+        return messagesToSend;
+    }
+
+    // 选择多模型答案
+    function selectMultiModelAnswer(index: number) {
+        const selectedResponse = multiModelResponses[index];
+        if (!selectedResponse || selectedResponse.isLoading) return;
+
+        // 设置布局为页签样式
+        multiModelLayout = 'tab';
+
+        // 创建assistant消息，只包含多模型完整结果，不单独显示选中的内容
+        const assistantMessage: Message = {
+            role: 'assistant',
+            content: '', // 不显示单独的内容，只通过multiModelResponses显示
+            multiModelResponses: multiModelResponses.map((response, i) => ({
+                ...response,
+                isSelected: i === index, // 标记哪个被选择
+                modelName: i === index ? response.modelName + ' ✅' : response.modelName, // 选择的模型名添加✅
+            })),
+        };
+
+        messages = [...messages, assistantMessage];
+
+        // 清除多模型状态
+        multiModelResponses = [];
+        isWaitingForAnswerSelection = false;
+        selectedAnswerIndex = null;
+        hasUnsavedChanges = true;
+
+        // 自动保存会话
+        saveCurrentSession(true);
+    }
+
     // 发送消息
     async function sendMessage() {
         if ((!currentInput.trim() && currentAttachments.length === 0) || isLoading) return;
+
+        // 如果处于等待选择答案状态，阻止发送
+        if (isWaitingForAnswerSelection) {
+            pushErrMsg(t('multiModel.waitingSelection'));
+            return;
+        }
 
         // 检查设置
         const providerConfig = getCurrentProviderConfig();
@@ -549,6 +956,12 @@
         const modelConfig = getCurrentModelConfig();
         if (!modelConfig) {
             pushErrMsg(t('aiSidebar.errors.noModel'));
+            return;
+        }
+
+        // 如果启用了多模型模式且在问答模式
+        if (enableMultiModel && chatMode === 'ask' && selectedMultiModels.length > 0) {
+            await sendMultiModelMessage();
             return;
         }
 
@@ -1493,6 +1906,26 @@
             abortMessage();
         }
 
+        // 如果有未选择的多模型响应，先保存它们
+        if (isWaitingForAnswerSelection && multiModelResponses.length > 0) {
+            const firstSuccessIndex = multiModelResponses.findIndex(r => !r.error && !r.isLoading);
+            
+            if (firstSuccessIndex !== -1) {
+                const assistantMessage: Message = {
+                    role: 'assistant',
+                    content: '',
+                    multiModelResponses: multiModelResponses.map((response, i) => ({
+                        ...response,
+                        isSelected: i === firstSuccessIndex,
+                        modelName: i === firstSuccessIndex ? response.modelName + ' ✅' : response.modelName,
+                    })),
+                };
+                
+                messages = [...messages, assistantMessage];
+                hasUnsavedChanges = true;
+            }
+        }
+
         if (hasUnsavedChanges && messages.filter(m => m.role !== 'system').length > 0) {
             confirm(
                 t('aiSidebar.confirm.clearChat.title'),
@@ -1517,6 +1950,13 @@
         thinkingCollapsed = {};
         currentSessionId = '';
         hasUnsavedChanges = false;
+        
+        // 清除多模型状态
+        multiModelResponses = [];
+        isWaitingForAnswerSelection = false;
+        selectedAnswerIndex = null;
+        selectedTabIndex = 0;
+        
         pushMsg(t('aiSidebar.success.clearSuccess'));
     }
 
@@ -2384,6 +2824,26 @@
             abortMessage();
         }
 
+        // 如果有未选择的多模型响应，先保存它们
+        if (isWaitingForAnswerSelection && multiModelResponses.length > 0) {
+            const firstSuccessIndex = multiModelResponses.findIndex(r => !r.error && !r.isLoading);
+            
+            if (firstSuccessIndex !== -1) {
+                const assistantMessage: Message = {
+                    role: 'assistant',
+                    content: '',
+                    multiModelResponses: multiModelResponses.map((response, i) => ({
+                        ...response,
+                        isSelected: i === firstSuccessIndex,
+                        modelName: i === firstSuccessIndex ? response.modelName + ' ✅' : response.modelName,
+                    })),
+                };
+                
+                messages = [...messages, assistantMessage];
+                hasUnsavedChanges = true;
+            }
+        }
+
         if (hasUnsavedChanges) {
             confirm(
                 t('aiSidebar.confirm.switchSession.title'),
@@ -2418,6 +2878,13 @@
             }
             currentSessionId = sessionId;
             hasUnsavedChanges = false;
+            
+            // 清除多模型状态
+            multiModelResponses = [];
+            isWaitingForAnswerSelection = false;
+            selectedAnswerIndex = null;
+            selectedTabIndex = 0;
+            
             await scrollToBottom();
         }
     }
@@ -2426,6 +2893,28 @@
         // 如果消息正在生成，先中断
         if (isLoading && abortController) {
             abortMessage();
+        }
+
+        // 如果有未选择的多模型响应，保存它们
+        if (isWaitingForAnswerSelection && multiModelResponses.length > 0) {
+            // 找到第一个成功的响应作为默认选择（如果所有都失败则不保存）
+            const firstSuccessIndex = multiModelResponses.findIndex(r => !r.error && !r.isLoading);
+            
+            if (firstSuccessIndex !== -1) {
+                // 创建assistant消息，保存所有多模型响应
+                const assistantMessage: Message = {
+                    role: 'assistant',
+                    content: '', // 不显示单独的内容
+                    multiModelResponses: multiModelResponses.map((response, i) => ({
+                        ...response,
+                        isSelected: i === firstSuccessIndex, // 标记第一个成功的为默认选择
+                        modelName: i === firstSuccessIndex ? response.modelName + ' ✅' : response.modelName,
+                    })),
+                };
+                
+                messages = [...messages, assistantMessage];
+                hasUnsavedChanges = true;
+            }
         }
 
         // 如果有未保存的更改，自动保存当前会话
@@ -2442,6 +2931,12 @@
         contextDocuments = [];
         currentSessionId = '';
         hasUnsavedChanges = false;
+
+        // 清除多模型状态
+        multiModelResponses = [];
+        isWaitingForAnswerSelection = false;
+        selectedAnswerIndex = null;
+        selectedTabIndex = 0;
     }
 
     async function deleteSession(sessionId: string) {
@@ -3568,17 +4063,112 @@
                             </div>
                         {/if}
 
-                        <!-- 显示消息内容 -->
-                        <div
-                            class="ai-message__content protyle-wysiwyg"
-                            style={messageFontSize ? `font-size: ${messageFontSize}px;` : ''}
-                        >
-                            {@html formatMessage(message.content)}
-                        </div>
+                        <!-- 显示消息内容（只有在有实际内容时才显示） -->
+                        {#if message.content && message.content.toString().trim()}
+                            <div
+                                class="ai-message__content protyle-wysiwyg"
+                                style={messageFontSize ? `font-size: ${messageFontSize}px;` : ''}
+                            >
+                                {@html formatMessage(message.content)}
+                            </div>
+                        {/if}
+
+                        <!-- 显示多模型响应（历史消息） -->
+                        {#if message.role === 'assistant' && message.multiModelResponses && message.multiModelResponses.length > 0}
+                            <div class="ai-message__multi-model-responses">
+                                <div class="ai-message__multi-model-header">
+                                    <h4>🤖 多模型响应</h4>
+                                </div>
+                                <!-- 使用页签样式显示历史多模型响应 -->
+                                <div class="ai-message__multi-model-tabs">
+                                    <div class="ai-message__multi-model-tab-headers">
+                                        {#each message.multiModelResponses as response, index}
+                                            {@const tabKey = `history_multi_${messageIndex}_${msgIndex}`}
+                                            {@const currentTabIndex = thinkingCollapsed[`${tabKey}_selectedTab`] ?? message.multiModelResponses.findIndex(r => r.isSelected) ?? 0}
+                                            <button
+                                                class="ai-message__multi-model-tab-header"
+                                                class:ai-message__multi-model-tab-header--active={currentTabIndex === index}
+                                                on:click={() => {
+                                                    thinkingCollapsed[`${tabKey}_selectedTab`] = index;
+                                                    thinkingCollapsed = { ...thinkingCollapsed };
+                                                }}
+                                            >
+                                                <span class="ai-message__multi-model-tab-title">
+                                                    {response.modelName}
+                                                </span>
+                                                {#if response.error}
+                                                    <span class="ai-message__multi-model-tab-status ai-message__multi-model-tab-status--error">
+                                                        ❌
+                                                    </span>
+                                                {/if}
+                                            </button>
+                                        {/each}
+                                    </div>
+                                    <div class="ai-message__multi-model-tab-content">
+                                        {#each message.multiModelResponses as response, index}
+                                            {@const tabKey = `history_multi_${messageIndex}_${msgIndex}`}
+                                            {@const currentTabIndex = thinkingCollapsed[`${tabKey}_selectedTab`] ?? message.multiModelResponses.findIndex(r => r.isSelected) ?? 0}
+                                            {#if currentTabIndex === index}
+                                                <div class="ai-message__multi-model-tab-panel">
+                                                    {#if response.thinking}
+                                                        <div class="ai-message__thinking">
+                                                            <div
+                                                                class="ai-message__thinking-header"
+                                                                on:click={() => {
+                                                                    const key = `history_multi_${messageIndex}_${msgIndex}_${index}_thinking`;
+                                                                    thinkingCollapsed[key] =
+                                                                        !thinkingCollapsed[key];
+                                                                }}
+                                                            >
+                                                                <svg
+                                                                    class="ai-message__thinking-icon"
+                                                                    class:collapsed={thinkingCollapsed[
+                                                                        `history_multi_${messageIndex}_${msgIndex}_${index}_thinking`
+                                                                    ]}
+                                                                >
+                                                                    <use xlink:href="#iconRight"></use>
+                                                                </svg>
+                                                                <span class="ai-message__thinking-title">
+                                                                    💭 思考过程
+                                                                </span>
+                                                            </div>
+                                                            {#if !thinkingCollapsed[`history_multi_${messageIndex}_${msgIndex}_${index}_thinking`]}
+                                                                <div
+                                                                    class="ai-message__thinking-content protyle-wysiwyg"
+                                                                >
+                                                                    {@html formatMessage(response.thinking)}
+                                                                </div>
+                                                            {/if}
+                                                        </div>
+                                                    {/if}
+
+                                                    <div
+                                                        class="ai-message__multi-model-tab-panel-content protyle-wysiwyg"
+                                                        style={messageFontSize
+                                                            ? `font-size: ${messageFontSize}px;`
+                                                            : ''}
+                                                    >
+                                                        {#if response.error}
+                                                            <div class="ai-message__multi-model-tab-panel-error">
+                                                                {response.error}
+                                                            </div>
+                                                        {:else if response.content}
+                                                            {@html formatMessage(response.content)}
+                                                        {/if}
+                                                    </div>
+                                                </div>
+                                            {/if}
+                                        {/each}
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
 
                         <!-- 显示上下文文档和附件 -->
                         {#if (message.contextDocuments && message.contextDocuments.length > 0) || (message.attachments && message.attachments.length > 0)}
-                            {@const contextCount = (message.contextDocuments?.length || 0) + (message.attachments?.length || 0)}
+                            {@const contextCount =
+                                (message.contextDocuments?.length || 0) +
+                                (message.attachments?.length || 0)}
                             <div class="ai-message__context-docs">
                                 <div class="ai-message__context-docs-title">
                                     📎 {t('aiSidebar.context.content')} ({contextCount})
@@ -3935,6 +4525,280 @@
             </div>
         {/if}
 
+        <!-- 多模型响应 -->
+        {#if multiModelResponses.length > 0}
+            <div class="ai-sidebar__multi-model-responses">
+                <div class="ai-sidebar__multi-model-header">
+                    <div class="ai-sidebar__multi-model-header-top">
+                        <h3>{t('multiModel.responses')}</h3>
+                        <div class="ai-sidebar__multi-model-layout-selector">
+                            <button
+                                class="b3-button b3-button--text b3-button--small"
+                                class:b3-button--primary={multiModelLayout === 'card'}
+                                on:click={() => (multiModelLayout = 'card')}
+                                title={t('multiModel.layout.card')}
+                            >
+                                <svg class="b3-button__icon">
+                                    <use xlink:href="#iconLayout"></use>
+                                </svg>
+                                {t('multiModel.layout.card')}
+                            </button>
+                            <button
+                                class="b3-button b3-button--text b3-button--small"
+                                class:b3-button--primary={multiModelLayout === 'tab'}
+                                on:click={() => (multiModelLayout = 'tab')}
+                                title={t('multiModel.layout.tab')}
+                            >
+                                <svg class="b3-button__icon">
+                                    <use xlink:href="#iconTab"></use>
+                                </svg>
+                                {t('multiModel.layout.tab')}
+                            </button>
+                        </div>
+                    </div>
+                    {#if isWaitingForAnswerSelection}
+                        <div class="ai-sidebar__multi-model-hint">
+                            {t('multiModel.waitingSelection')}
+                        </div>
+                    {/if}
+                </div>
+                {#if multiModelLayout === 'card'}
+                    <div class="ai-sidebar__multi-model-cards">
+                        {#each multiModelResponses as response, index}
+                            <div
+                                class="ai-sidebar__multi-model-card"
+                                class:ai-sidebar__multi-model-card--selected={selectedAnswerIndex ===
+                                    index}
+                            >
+                                <div class="ai-sidebar__multi-model-card-header">
+                                    <div class="ai-sidebar__multi-model-card-title">
+                                        <span class="ai-sidebar__multi-model-card-model-name">
+                                            {response.modelName}
+                                            {#if selectedAnswerIndex === index}
+                                                <span
+                                                    class="ai-sidebar__multi-model-selected-indicator"
+                                                >
+                                                    ✅
+                                                </span>
+                                            {/if}
+                                        </span>
+                                        {#if response.isLoading}
+                                            <span
+                                                class="ai-sidebar__multi-model-card-status ai-sidebar__multi-model-card-status--loading"
+                                            >
+                                                ⏳ {t('multiModel.loading')}
+                                            </span>
+                                        {:else if response.error}
+                                            <span
+                                                class="ai-sidebar__multi-model-card-status ai-sidebar__multi-model-card-status--error"
+                                            >
+                                                ❌ {t('multiModel.error')}
+                                            </span>
+                                        {/if}
+                                    </div>
+                                    {#if !response.isLoading && !response.error && isWaitingForAnswerSelection}
+                                        <button
+                                            class="b3-button b3-button--primary ai-sidebar__multi-model-select-btn"
+                                            on:click={() => selectMultiModelAnswer(index)}
+                                        >
+                                            {selectedAnswerIndex === index
+                                                ? t('multiModel.answerSelected')
+                                                : t('multiModel.selectAnswer')}
+                                        </button>
+                                    {/if}
+                                </div>
+
+                                {#if response.thinking}
+                                    <div class="ai-message__thinking">
+                                        <div
+                                            class="ai-message__thinking-header"
+                                            on:click={() => {
+                                                const key = `multi_${index}_thinking`;
+                                                thinkingCollapsed[key] = !thinkingCollapsed[key];
+                                            }}
+                                        >
+                                            <svg
+                                                class="ai-message__thinking-icon"
+                                                class:collapsed={thinkingCollapsed[
+                                                    `multi_${index}_thinking`
+                                                ]}
+                                            >
+                                                <use xlink:href="#iconRight"></use>
+                                            </svg>
+                                            <span class="ai-message__thinking-title">
+                                                💭 思考过程
+                                            </span>
+                                        </div>
+                                        {#if !thinkingCollapsed[`multi_${index}_thinking`]}
+                                            <div
+                                                class="ai-message__thinking-content protyle-wysiwyg"
+                                            >
+                                                {@html formatMessage(response.thinking)}
+                                            </div>
+                                        {/if}
+                                    </div>
+                                {/if}
+
+                                <div
+                                    class="ai-sidebar__multi-model-card-content protyle-wysiwyg"
+                                    style={messageFontSize
+                                        ? `font-size: ${messageFontSize}px;`
+                                        : ''}
+                                >
+                                    {#if response.error}
+                                        <div class="ai-sidebar__multi-model-card-error">
+                                            {response.error}
+                                        </div>
+                                    {:else if response.content}
+                                        {@html formatMessage(response.content)}
+                                    {:else if response.isLoading}
+                                        <div class="ai-sidebar__multi-model-card-loading">
+                                            {t('multiModel.loading')}
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                {:else}
+                    <div class="ai-sidebar__multi-model-tabs">
+                        <div class="ai-sidebar__multi-model-tab-headers">
+                            {#each multiModelResponses as response, index}
+                                <button
+                                    class="ai-sidebar__multi-model-tab-header"
+                                    class:ai-sidebar__multi-model-tab-header--active={selectedTabIndex ===
+                                        index}
+                                    on:click={() => (selectedTabIndex = index)}
+                                >
+                                    <span class="ai-sidebar__multi-model-tab-title">
+                                        {response.modelName}
+                                        {#if selectedAnswerIndex === index}
+                                            <span
+                                                class="ai-sidebar__multi-model-selected-indicator"
+                                            >
+                                                ✅
+                                            </span>
+                                        {/if}
+                                    </span>
+                                    {#if response.isLoading}
+                                        <span
+                                            class="ai-sidebar__multi-model-tab-status ai-sidebar__multi-model-tab-status--loading"
+                                        >
+                                            ⏳
+                                        </span>
+                                    {:else if response.error}
+                                        <span
+                                            class="ai-sidebar__multi-model-tab-status ai-sidebar__multi-model-tab-status--error"
+                                        >
+                                            ❌
+                                        </span>
+                                    {/if}
+                                </button>
+                            {/each}
+                        </div>
+                        <div class="ai-sidebar__multi-model-tab-content">
+                            {#if multiModelResponses[selectedTabIndex]}
+                                {@const response = multiModelResponses[selectedTabIndex]}
+                                <div class="ai-sidebar__multi-model-tab-panel">
+                                    <div class="ai-sidebar__multi-model-tab-panel-header">
+                                        <div class="ai-sidebar__multi-model-tab-panel-title">
+                                            <span
+                                                class="ai-sidebar__multi-model-tab-panel-model-name"
+                                            >
+                                                {response.modelName}
+                                                {#if selectedAnswerIndex === selectedTabIndex}
+                                                    <span
+                                                        class="ai-sidebar__multi-model-selected-indicator"
+                                                    >
+                                                        ✅
+                                                    </span>
+                                                {/if}
+                                            </span>
+                                            {#if response.isLoading}
+                                                <span
+                                                    class="ai-sidebar__multi-model-tab-panel-status ai-sidebar__multi-model-tab-panel-status--loading"
+                                                >
+                                                    ⏳ {t('multiModel.loading')}
+                                                </span>
+                                            {:else if response.error}
+                                                <span
+                                                    class="ai-sidebar__multi-model-tab-panel-status ai-sidebar__multi-model-tab-panel-status--error"
+                                                >
+                                                    ❌ {t('multiModel.error')}
+                                                </span>
+                                            {/if}
+                                        </div>
+                                        {#if !response.isLoading && !response.error && isWaitingForAnswerSelection}
+                                            <button
+                                                class="b3-button b3-button--primary ai-sidebar__multi-model-select-btn"
+                                                on:click={() =>
+                                                    selectMultiModelAnswer(selectedTabIndex)}
+                                            >
+                                                {selectedAnswerIndex === selectedTabIndex
+                                                    ? t('multiModel.answerSelected')
+                                                    : t('multiModel.selectAnswer')}
+                                            </button>
+                                        {/if}
+                                    </div>
+
+                                    {#if response.thinking}
+                                        <div class="ai-message__thinking">
+                                            <div
+                                                class="ai-message__thinking-header"
+                                                on:click={() => {
+                                                    const key = `multi_tab_${selectedTabIndex}_thinking`;
+                                                    thinkingCollapsed[key] =
+                                                        !thinkingCollapsed[key];
+                                                }}
+                                            >
+                                                <svg
+                                                    class="ai-message__thinking-icon"
+                                                    class:collapsed={thinkingCollapsed[
+                                                        `multi_tab_${selectedTabIndex}_thinking`
+                                                    ]}
+                                                >
+                                                    <use xlink:href="#iconRight"></use>
+                                                </svg>
+                                                <span class="ai-message__thinking-title">
+                                                    💭 思考过程
+                                                </span>
+                                            </div>
+                                            {#if !thinkingCollapsed[`multi_tab_${selectedTabIndex}_thinking`]}
+                                                <div
+                                                    class="ai-message__thinking-content protyle-wysiwyg"
+                                                >
+                                                    {@html formatMessage(response.thinking)}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/if}
+
+                                    <div
+                                        class="ai-sidebar__multi-model-tab-panel-content protyle-wysiwyg"
+                                        style={messageFontSize
+                                            ? `font-size: ${messageFontSize}px;`
+                                            : ''}
+                                    >
+                                        {#if response.error}
+                                            <div class="ai-sidebar__multi-model-tab-panel-error">
+                                                {response.error}
+                                            </div>
+                                        {:else if response.content}
+                                            {@html formatMessage(response.content)}
+                                        {:else if response.isLoading}
+                                            <div class="ai-sidebar__multi-model-tab-panel-loading">
+                                                {t('multiModel.loading')}
+                                            </div>
+                                        {/if}
+                                    </div>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                {/if}
+            </div>
+        {/if}
+
         {#if messages.filter(msg => msg.role !== 'system').length === 0 && !isLoading}
             <div class="ai-sidebar__empty">
                 <div class="ai-sidebar__empty-icon">💬</div>
@@ -4043,6 +4907,19 @@
                     <span>{t('aiSidebar.agent.tools')} ({selectedTools.length})</span>
                 </button>
             {/if}
+
+            <!-- 多模型对话按钮（仅在问答模式下显示） -->
+            {#if chatMode === 'ask'}
+                <div class="ai-sidebar__multi-model-selector-wrapper">
+                    <MultiModelSelector
+                        {providers}
+                        bind:selectedModels={selectedMultiModels}
+                        bind:enableMultiModel
+                        on:change={handleMultiModelChange}
+                        on:toggleEnable={handleToggleMultiModel}
+                    />
+                </div>
+            {/if}
         </div>
 
         <div class="ai-sidebar__input-row">
@@ -4121,14 +4998,16 @@
                     <svg class="b3-button__icon"><use xlink:href="#iconList"></use></svg>
                 </button>
             </div>
-            <div class="ai-sidebar__model-selector-container">
-                <ModelSelector
-                    {providers}
-                    {currentProvider}
-                    {currentModelId}
-                    on:select={handleModelSelect}
-                />
-            </div>
+            {#if !(chatMode === 'ask' && enableMultiModel)}
+                <div class="ai-sidebar__model-selector-container">
+                    <ModelSelector
+                        {providers}
+                        {currentProvider}
+                        {currentModelId}
+                        on:select={handleModelSelect}
+                    />
+                </div>
+            {/if}
         </div>
 
         <!-- 提示词选择器下拉菜单 -->
@@ -5364,6 +6243,10 @@
         }
     }
 
+    .ai-sidebar__multi-model-selector-wrapper {
+        margin-left: auto;
+    }
+
     .ai-sidebar__input-row {
         display: flex;
         gap: 0;
@@ -6546,6 +7429,593 @@
         background: var(--b3-border-color);
     }
 
+    // 多模型响应样式
+    .ai-sidebar__multi-model-responses {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 12px 0;
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    .ai-sidebar__multi-model-header {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .ai-sidebar__multi-model-header-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .ai-sidebar__multi-model-header-top h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--b3-theme-on-background);
+        flex-shrink: 0;
+    }
+
+    .ai-sidebar__multi-model-hint {
+        font-size: 13px;
+        color: var(--b3-theme-primary);
+        background: var(--b3-theme-primary-lightest);
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--b3-theme-primary-light);
+        text-align: center;
+        font-weight: 500;
+    }
+
+    .ai-sidebar__multi-model-cards {
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        padding: 8px 4px;
+        scroll-snap-type: x mandatory;
+
+        &::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: var(--b3-theme-surface);
+            border-radius: 3px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: var(--b3-theme-on-surface-light);
+            border-radius: 3px;
+
+            &:hover {
+                background: var(--b3-theme-on-surface);
+            }
+        }
+    }
+
+    .ai-sidebar__multi-model-card {
+        flex: 0 0 50%;
+        max-width: 400px;
+        min-width: 300px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        background: var(--b3-theme-background);
+        border: 2px solid var(--b3-border-color);
+        border-radius: 8px;
+        scroll-snap-align: start;
+        transition: all 0.2s ease;
+
+        &:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-color: var(--b3-theme-primary-light);
+        }
+
+        &--selected {
+            border-color: var(--b3-theme-primary);
+            background: var(--b3-theme-primary-lightest);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+    }
+
+    .ai-sidebar__multi-model-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--b3-border-color);
+    }
+
+    .ai-sidebar__multi-model-card-title {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+    }
+
+    .ai-sidebar__multi-model-card-model-name,
+    .ai-sidebar__multi-model-tab-title,
+    .ai-sidebar__multi-model-tab-panel-model-name {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .ai-sidebar__multi-model-selected-indicator,
+    .ai-message__multi-model-selected-indicator {
+        color: var(--b3-theme-success);
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .ai-sidebar__multi-model-card-status {
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 500;
+
+        &--loading {
+            background: var(--b3-theme-primary-lightest);
+            color: var(--b3-theme-primary);
+        }
+
+        &--error {
+            background: var(--b3-theme-error-lighter);
+            color: var(--b3-theme-error);
+        }
+    }
+
+    .ai-sidebar__multi-model-select-btn {
+        flex-shrink: 0;
+        font-size: 12px;
+        padding: 4px 12px;
+        height: auto;
+        white-space: nowrap;
+    }
+
+    .ai-sidebar__multi-model-card-content {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 400px;
+        padding: 4px;
+
+        &::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: var(--b3-theme-surface);
+            border-radius: 3px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: var(--b3-theme-on-surface-light);
+            border-radius: 3px;
+
+            &:hover {
+                background: var(--b3-theme-on-surface);
+            }
+        }
+    }
+
+    .ai-sidebar__multi-model-card-loading {
+        text-align: center;
+        color: var(--b3-theme-on-surface-light);
+        font-style: italic;
+        padding: 20px;
+    }
+
+    .ai-sidebar__multi-model-card-error {
+        color: var(--b3-theme-error);
+        font-size: 12px;
+        padding: 12px;
+        background: var(--b3-theme-error-lighter);
+        border-radius: 4px;
+        word-break: break-word;
+    }
+
+    .ai-sidebar__multi-model-layout-selector {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+    }
+
+    .ai-sidebar__multi-model-tabs {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .ai-sidebar__multi-model-tab-headers {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--b3-border-color);
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
+
+    .ai-sidebar__multi-model-tab-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border: none;
+        background: none;
+        color: var(--b3-theme-on-surface-light);
+        cursor: pointer;
+        border-radius: 4px 4px 0 0;
+        transition: all 0.2s;
+        white-space: nowrap;
+        min-width: 120px;
+        justify-content: center;
+
+        &:hover {
+            background: var(--b3-theme-surface);
+            color: var(--b3-theme-on-surface);
+        }
+
+        &--active {
+            background: var(--b3-theme-primary-lightest);
+            color: var(--b3-theme-primary);
+            border-bottom: 2px solid var(--b3-theme-primary);
+        }
+    }
+
+    .ai-sidebar__multi-model-tab-title {
+        font-size: 12px;
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ai-sidebar__multi-model-tab-status {
+        font-size: 10px;
+        flex-shrink: 0;
+
+        &--loading {
+            color: var(--b3-theme-primary);
+        }
+
+        &--error {
+            color: var(--b3-theme-error);
+        }
+    }
+
+    .ai-sidebar__multi-model-tab-content {
+        flex: 1;
+        min-height: 300px;
+    }
+
+    .ai-sidebar__multi-model-tab-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        background: var(--b3-theme-background);
+        border: 1px solid var(--b3-border-color);
+        border-radius: 8px;
+    }
+
+    .ai-sidebar__multi-model-tab-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--b3-border-color);
+    }
+
+    .ai-sidebar__multi-model-tab-panel-title {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+    }
+
+    .ai-sidebar__multi-model-tab-panel-model-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--b3-theme-on-background);
+    }
+
+    .ai-sidebar__multi-model-tab-panel-status {
+        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 500;
+
+        &--loading {
+            background: var(--b3-theme-primary-lightest);
+            color: var(--b3-theme-primary);
+        }
+
+        &--error {
+            background: var(--b3-theme-error-lighter);
+            color: var(--b3-theme-error);
+        }
+    }
+
+    .ai-sidebar__multi-model-tab-panel-content {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 500px;
+        padding: 4px;
+
+        &::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: var(--b3-theme-surface);
+            border-radius: 3px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: var(--b3-theme-on-surface-light);
+            border-radius: 3px;
+
+            &:hover {
+                background: var(--b3-theme-on-surface);
+            }
+        }
+    }
+
+    .ai-sidebar__multi-model-tab-panel-loading {
+        text-align: center;
+        color: var(--b3-theme-on-surface-light);
+        font-style: italic;
+        padding: 20px;
+    }
+
+    .ai-sidebar__multi-model-tab-panel-error {
+        color: var(--b3-theme-error);
+        font-size: 12px;
+        padding: 12px;
+        background: var(--b3-theme-error-lighter);
+        border-radius: 4px;
+        word-break: break-word;
+    }
+
+    // 历史消息中的多模型响应样式
+    .ai-message__multi-model-responses {
+        margin-top: 12px;
+        padding: 12px;
+        background: var(--b3-theme-surface);
+        border: 1px solid var(--b3-border-color);
+        border-radius: 8px;
+    }
+
+    .ai-message__multi-model-header {
+        margin-bottom: 12px;
+
+        h4 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--b3-theme-on-surface);
+        }
+    }
+
+    // 历史消息中的多模型页签样式
+    .ai-message__multi-model-tabs {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .ai-message__multi-model-tab-headers {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--b3-border-color);
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
+
+    .ai-message__multi-model-tab-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border: none;
+        background: none;
+        color: var(--b3-theme-on-surface-light);
+        cursor: pointer;
+        border-radius: 4px 4px 0 0;
+        transition: all 0.2s;
+        white-space: nowrap;
+        min-width: 100px;
+        justify-content: center;
+
+        &:hover {
+            background: var(--b3-theme-surface);
+            color: var(--b3-theme-on-surface);
+        }
+
+        &--active {
+            background: var(--b3-theme-primary-lightest);
+            color: var(--b3-theme-primary);
+            border-bottom: 2px solid var(--b3-theme-primary);
+        }
+    }
+
+    .ai-message__multi-model-tab-title {
+        font-size: 12px;
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ai-message__multi-model-tab-status {
+        font-size: 10px;
+        flex-shrink: 0;
+
+        &--error {
+            color: var(--b3-theme-error);
+        }
+    }
+
+    .ai-message__multi-model-tab-content {
+        flex: 1;
+    }
+
+    .ai-message__multi-model-tab-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px;
+        background: var(--b3-theme-background);
+        border: 1px solid var(--b3-border-color);
+        border-radius: 8px;
+    }
+
+    .ai-message__multi-model-tab-panel-content {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 400px;
+        padding: 4px;
+
+        &::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: var(--b3-theme-surface);
+            border-radius: 3px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: var(--b3-theme-on-surface-light);
+            border-radius: 3px;
+
+            &:hover {
+                background: var(--b3-theme-on-surface);
+            }
+        }
+    }
+
+    .ai-message__multi-model-tab-panel-error {
+        color: var(--b3-theme-error);
+        font-size: 12px;
+        padding: 12px;
+        background: var(--b3-theme-error-lighter);
+        border-radius: 4px;
+        word-break: break-word;
+    }
+
+    // 保留旧的卡片样式（如果还需要）
+    .ai-message__multi-model-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .ai-message__multi-model-card {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        background: var(--b3-theme-background);
+        border: 1px solid var(--b3-border-color);
+        border-radius: 6px;
+        transition: all 0.2s ease;
+
+        &--selected {
+            border-color: var(--b3-theme-success);
+            background: var(--b3-theme-success-lightest);
+        }
+    }
+
+    .ai-message__multi-model-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--b3-border-color);
+    }
+
+    .ai-message__multi-model-card-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 1;
+    }
+
+    .ai-message__multi-model-card-model-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--b3-theme-on-background);
+    }
+
+    .ai-message__multi-model-selected-indicator {
+        color: var(--b3-theme-success);
+        font-size: 14px;
+    }
+
+    .ai-message__multi-model-card-status {
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 500;
+
+        &--error {
+            background: var(--b3-theme-error-lighter);
+            color: var(--b3-theme-error);
+        }
+    }
+
+    .ai-message__multi-model-card-content {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 300px;
+        padding: 4px;
+
+        &::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: var(--b3-theme-surface);
+            border-radius: 3px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: var(--b3-theme-on-surface-light);
+            border-radius: 3px;
+
+            &:hover {
+                background: var(--b3-theme-on-surface);
+            }
+        }
+    }
+
+    .ai-message__multi-model-card-error {
+        color: var(--b3-theme-error);
+        font-size: 12px;
+        padding: 12px;
+        background: var(--b3-theme-error-lighter);
+        border-radius: 4px;
+        word-break: break-word;
+    }
+
     // 响应式布局
     @media (max-width: 768px) {
         .ai-sidebar__header {
@@ -6618,6 +8088,45 @@
                 width: 14px;
                 height: 14px;
             }
+        }
+
+        // 多模型页签响应式样式
+        .ai-sidebar__multi-model-tabs {
+            gap: 8px;
+        }
+
+        .ai-sidebar__multi-model-tab-headers {
+            gap: 1px;
+        }
+
+        .ai-sidebar__multi-model-tab-header {
+            padding: 6px 10px;
+            min-width: 100px;
+        }
+
+        .ai-sidebar__multi-model-tab-title {
+            font-size: 11px;
+        }
+
+        .ai-sidebar__multi-model-tab-status {
+            font-size: 9px;
+        }
+
+        .ai-sidebar__multi-model-tab-panel {
+            padding: 12px;
+        }
+
+        .ai-sidebar__multi-model-tab-panel-title {
+            font-size: 13px;
+        }
+
+        .ai-sidebar__multi-model-tab-panel-status {
+            font-size: 11px;
+            padding: 1px 4px;
+        }
+
+        .ai-sidebar__multi-model-tab-panel-content {
+            max-height: 400px;
         }
     }
 </style>

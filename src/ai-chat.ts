@@ -57,6 +57,16 @@ export interface Message {
     tool_call_id?: string; // Tool 结果的 call_id
     name?: string; // Tool 的名称
     finalReply?: string; // Agent模式：工具调用后的最终回复
+    multiModelResponses?: Array<{
+        provider: string;
+        modelId: string;
+        modelName: string;
+        content: string;
+        thinking?: string;
+        isLoading: boolean;
+        error?: string;
+        isSelected?: boolean; // 是否被选择
+    }>; // 多模型响应
 }
 
 export interface ChatOptions {

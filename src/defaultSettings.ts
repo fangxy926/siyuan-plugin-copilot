@@ -64,6 +64,9 @@ export const getDefaultSettings = () => ({
     // 显示设置
     messageFontSize: 12 as number, // 消息字体大小
 
+    // 多模型设置
+    selectedMultiModels: [] as Array<{ provider: string; modelId: string }>, // 选中的多模型列表
+
     // 保留旧设置以便兼容升级
     aiProvider: 'openai',
     aiApiKey: '',
