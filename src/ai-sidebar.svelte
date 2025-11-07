@@ -2137,26 +2137,26 @@
                 const content = data.content.trim();
                 const imageRegex = /^!\[([^\]]*)\]\(([^)]+)\)$/;
                 const match = content.match(imageRegex);
-                
+
                 if (match) {
                     // 这是一个纯图片块，自动上传图片
                     const imagePath = match[2]; // 图片路径，如 assets/xxx.png
                     const imageName = match[1] || '图片'; // 图片名称
-                    
+
                     try {
                         // 从路径中提取实际的文件路径
                         // 思源笔记的图片路径格式：assets/xxx-xxxxx.png
                         const fullPath = `/data/${imagePath}`;
-                        
+
                         // 使用 fetch 获取图片数据
                         const response = await fetch(fullPath);
                         if (response.ok) {
                             const blob = await response.blob();
                             const file = new File([blob], imageName, { type: blob.type });
-                            
+
                             // 将图片转换为 base64 并添加为附件
                             const base64 = await fileToBase64(file);
-                            
+
                             currentAttachments = [
                                 ...currentAttachments,
                                 {
@@ -2166,7 +2166,7 @@
                                     mimeType: blob.type,
                                 },
                             ];
-                            
+
                             pushMsg(t('aiSidebar.success.imageAutoUploaded'));
                             return; // 图片已作为附件添加，不需要再添加为上下文文档
                         } else {
@@ -2178,7 +2178,7 @@
                         // 失败时继续作为普通块处理
                     }
                 }
-                
+
                 // 不是纯图片块或上传失败，按照原有逻辑处理
                 // 从块内容中提取前20个字作为显示标题
                 const contentPreview = data.content.replace(/\n/g, ' ').trim();
