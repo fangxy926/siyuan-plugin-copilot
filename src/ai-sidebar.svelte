@@ -915,7 +915,7 @@
             multiModelResponses: multiModelResponses.map((response, i) => ({
                 ...response,
                 isSelected: i === index, // 标记哪个被选择
-                modelName: i === index ? response.modelName + ' ✅' : response.modelName, // 选择的模型名添加✅
+                modelName: i === index ? ' ✅'+ response.modelName : response.modelName, // 选择的模型名添加✅
             })),
         };
 
@@ -1919,7 +1919,7 @@
                         isSelected: i === firstSuccessIndex,
                         modelName:
                             i === firstSuccessIndex
-                                ? response.modelName + ' ✅'
+                                ? '✅'+response.modelName
                                 : response.modelName,
                     })),
                 };
@@ -2840,7 +2840,7 @@
                         isSelected: i === firstSuccessIndex,
                         modelName:
                             i === firstSuccessIndex
-                                ? response.modelName + ' ✅'
+                                ? '✅'+response.modelName
                                 : response.modelName,
                     })),
                 };
@@ -2916,7 +2916,7 @@
                         isSelected: i === firstSuccessIndex, // 标记第一个成功的为默认选择
                         modelName:
                             i === firstSuccessIndex
-                                ? response.modelName + ' ✅'
+                                ? '✅' + response.modelName
                                 : response.modelName,
                     })),
                 };
