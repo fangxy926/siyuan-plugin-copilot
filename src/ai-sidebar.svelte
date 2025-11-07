@@ -2437,12 +2437,11 @@
             // 使用思源的 Lute 将 HTML 转换为 Markdown
             if (window.Lute) {
                 const lute = window.Lute.New();
-                const markdown = lute.BlockDOM2Md(html);
+                const markdown = lute.BlockDOM2StdMd(html);
 
                 // 将Markdown写入剪贴板
                 event.clipboardData?.setData('text/plain', markdown);
 
-                console.log('Copied as Markdown:', markdown);
             } else {
                 // 降级：如果Lute不可用，使用纯文本
                 const text = selection.toString();
