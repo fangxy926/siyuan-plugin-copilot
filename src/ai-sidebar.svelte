@@ -645,20 +645,26 @@
         if (!isFullscreen) {
             // 进入全屏
             if (sidebarContainer.requestFullscreen) {
-                sidebarContainer.requestFullscreen().then(() => {
-                    isFullscreen = true;
-                }).catch(err => {
-                    console.error('进入全屏失败:', err);
-                });
+                sidebarContainer
+                    .requestFullscreen()
+                    .then(() => {
+                        isFullscreen = true;
+                    })
+                    .catch(err => {
+                        console.error('进入全屏失败:', err);
+                    });
             }
         } else {
             // 退出全屏
             if (document.exitFullscreen) {
-                document.exitFullscreen().then(() => {
-                    isFullscreen = false;
-                }).catch(err => {
-                    console.error('退出全屏失败:', err);
-                });
+                document
+                    .exitFullscreen()
+                    .then(() => {
+                        isFullscreen = false;
+                    })
+                    .catch(err => {
+                        console.error('退出全屏失败:', err);
+                    });
             }
         }
     }
@@ -2268,7 +2274,8 @@
 
     // 处理全屏状态变化
     function handleFullscreenChange() {
-        isFullscreen = !!document.fullscreenElement && document.fullscreenElement === sidebarContainer;
+        isFullscreen =
+            !!document.fullscreenElement && document.fullscreenElement === sidebarContainer;
     }
 
     // 使用思源内置的Lute渲染markdown为HTML
@@ -5104,7 +5111,9 @@
                 title={isFullscreen ? '退出全屏' : '全屏查看'}
             >
                 <svg class="b3-button__icon">
-                    <use xlink:href={isFullscreen ? "#iconFullscreenExit" : "#iconFullscreen"}></use>
+                    <use
+                        xlink:href={isFullscreen ? '#iconFullscreenExit' : '#iconFullscreen'}
+                    ></use>
                 </svg>
             </button>
             <button
