@@ -2140,7 +2140,9 @@
             // 如果是多模型模式且正在等待选择答案
             if (isWaitingForAnswerSelection && multiModelResponses.length > 0) {
                 // 找到第一个成功的响应作为默认选择
-                const firstSuccessIndex = multiModelResponses.findIndex(r => !r.error && !r.isLoading);
+                const firstSuccessIndex = multiModelResponses.findIndex(
+                    r => !r.error && !r.isLoading
+                );
 
                 if (firstSuccessIndex !== -1) {
                     const selectedResponse = multiModelResponses[firstSuccessIndex];
