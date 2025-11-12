@@ -2714,7 +2714,7 @@
                 });
 
                 // 为代码块添加语言标签和复制按钮
-                const codeBlocks = element.querySelectorAll('pre > code[class*="language-"]');
+                const codeBlocks = element.querySelectorAll('pre > code');
                 codeBlocks.forEach((codeElement: HTMLElement) => {
                     const pre = codeElement.parentElement;
                     if (!pre || pre.hasAttribute('data-lang-added')) return;
@@ -2729,59 +2729,58 @@
                         }
                     }
 
-                    if (language) {
-                        // 标记已处理
-                        pre.setAttribute('data-lang-added', 'true');
+                    // 标记已处理
+                    pre.setAttribute('data-lang-added', 'true');
 
-                        // 创建工具栏容器
-                        const toolbar = document.createElement('div');
-                        toolbar.className = 'code-block-toolbar';
+                    // 创建工具栏容器
+                    const toolbar = document.createElement('div');
+                    toolbar.className = 'code-block-toolbar';
 
+                    // 只有当有语言时才创建语言标签
                         // 创建语言标签
                         const langLabel = document.createElement('div');
                         langLabel.className = 'code-block-lang-label';
                         langLabel.textContent = language;
-
-                        // 创建复制按钮
-                        const copyButton = document.createElement('button');
-                        copyButton.className = 'code-block-copy-btn';
-                        copyButton.innerHTML = '<svg><use xlink:href="#iconCopy"></use></svg>';
-                        copyButton.title = '复制代码';
-
-                        // 添加复制功能
-                        copyButton.addEventListener('click', () => {
-                            const code = codeElement.textContent || '';
-                            navigator.clipboard
-                                .writeText(code)
-                                .then(() => {
-                                    // 显示复制成功提示
-                                    pushMsg('已复制');
-                                    // 更新按钮图标
-                                    copyButton.innerHTML =
-                                        '<svg><use xlink:href="#iconCheck"></use></svg>';
-                                    copyButton.classList.add('copied');
-                                    setTimeout(() => {
-                                        copyButton.innerHTML =
-                                            '<svg><use xlink:href="#iconCopy"></use></svg>';
-                                        copyButton.classList.remove('copied');
-                                    }, 2000);
-                                })
-                                .catch(err => {
-                                    console.error('Copy failed:', err);
-                                    pushErrMsg('复制失败');
-                                });
-                        });
-
-                        // 组装工具栏
                         toolbar.appendChild(langLabel);
-                        toolbar.appendChild(copyButton);
 
-                        // 设置 pre 为相对定位
-                        pre.style.position = 'relative';
+                    // 创建复制按钮
+                    const copyButton = document.createElement('button');
+                    copyButton.className = 'code-block-copy-btn';
+                    copyButton.innerHTML = '<svg><use xlink:href="#iconCopy"></use></svg>';
+                    copyButton.title = '复制代码';
 
-                        // 将工具栏插入到 pre 的开头
-                        pre.insertBefore(toolbar, pre.firstChild);
-                    }
+                    // 添加复制功能
+                    copyButton.addEventListener('click', () => {
+                        const code = codeElement.textContent || '';
+                        navigator.clipboard
+                            .writeText(code)
+                            .then(() => {
+                                // 显示复制成功提示
+                                pushMsg('已复制');
+                                // 更新按钮图标
+                                copyButton.innerHTML =
+                                    '<svg><use xlink:href="#iconCheck"></use></svg>';
+                                copyButton.classList.add('copied');
+                                setTimeout(() => {
+                                    copyButton.innerHTML =
+                                        '<svg><use xlink:href="#iconCopy"></use></svg>';
+                                    copyButton.classList.remove('copied');
+                                }, 2000);
+                            })
+                            .catch(err => {
+                                console.error('Copy failed:', err);
+                                pushErrMsg('复制失败');
+                            });
+                    });
+
+                    // 组装工具栏
+                    toolbar.appendChild(copyButton);
+
+                    // 设置 pre 为相对定位
+                    pre.style.position = 'relative';
+
+                    // 将工具栏插入到 pre 的开头
+                    pre.insertBefore(toolbar, pre.firstChild);
                 });
             } catch (error) {
                 console.error('Cleanup code blocks error:', error);
