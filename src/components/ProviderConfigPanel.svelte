@@ -754,13 +754,6 @@
         }
     }
 
-    .label-hint {
-        font-size: 11px;
-        color: var(--b3-theme-on-surface-light);
-        font-weight: normal;
-        margin-left: 4px;
-    }
-
     .label-description {
         font-size: 11px;
         color: var(--b3-theme-on-surface-light);
@@ -861,13 +854,6 @@
         flex-direction: column;
         gap: 8px;
         margin-top: 4px;
-
-        .b3-label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 0;
-        }
 
         .capability-label {
             font-size: 12px;
