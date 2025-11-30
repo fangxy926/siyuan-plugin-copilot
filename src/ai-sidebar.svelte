@@ -307,6 +307,20 @@
         // 本次请求的 AbortController（用于单个模型的中断）
         const localAbort = new AbortController();
 
+        // 解析自定义参数
+        let customBody = {};
+        if (modelConfig.customBody) {
+            try {
+                customBody = JSON.parse(modelConfig.customBody);
+            } catch (e) {
+                console.error('Failed to parse custom body:', e);
+                multiModelResponses[index].error = '自定义参数 JSON 格式错误';
+                multiModelResponses[index].isLoading = false;
+                multiModelResponses = [...multiModelResponses];
+                return;
+            }
+        }
+
         try {
             let fullText = '';
             let thinking = '';
@@ -321,6 +335,7 @@
                     maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                     stream: true,
                     signal: localAbort.signal,
+                    customBody,
                     enableThinking: modelConfig.capabilities?.thinking || false,
                     onThinkingChunk: async (chunk: string) => {
                         thinking += chunk;
@@ -472,6 +487,21 @@
         );
 
         const localAbort = new AbortController();
+
+        // 解析自定义参数
+        let customBody = {};
+        if (modelConfig.customBody) {
+            try {
+                customBody = JSON.parse(modelConfig.customBody);
+            } catch (e) {
+                console.error('Failed to parse custom body:', e);
+                msg.multiModelResponses[responseIndex].error = '自定义参数 JSON 格式错误';
+                msg.multiModelResponses[responseIndex].isLoading = false;
+                messages = [...messages];
+                return;
+            }
+        }
+
         try {
             let fullText = '';
             let thinking = '';
@@ -486,6 +516,7 @@
                     maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                     stream: true,
                     signal: localAbort.signal,
+                    customBody,
                     enableThinking: modelConfig.capabilities?.thinking || false,
                     onThinkingChunk: async (chunk: string) => {
                         thinking += chunk;
@@ -1176,6 +1207,20 @@
             const { providerConfig, modelConfig } = config;
             if (!providerConfig.apiKey) return;
 
+            // 解析自定义参数
+            let customBody = {};
+            if (modelConfig.customBody) {
+                try {
+                    customBody = JSON.parse(modelConfig.customBody);
+                } catch (e) {
+                    console.error('Failed to parse custom body:', e);
+                    multiModelResponses[index].error = '自定义参数 JSON 格式错误';
+                    multiModelResponses[index].isLoading = false;
+                    multiModelResponses = [...multiModelResponses];
+                    return;
+                }
+            }
+
             try {
                 let fullText = '';
                 let thinking = '';
@@ -1191,6 +1236,7 @@
                         stream: true,
                         signal: abortController.signal,
                         enableThinking: modelConfig.capabilities?.thinking || false,
+                        customBody, // 传递自定义参数
                         onThinkingChunk: async (chunk: string) => {
                             thinking += chunk;
                             multiModelResponses[index].thinking = thinking;
@@ -1528,6 +1574,18 @@
         if (!modelConfig) {
             pushErrMsg(t('aiSidebar.errors.noModel'));
             return;
+        }
+
+        // 解析自定义参数
+        let customBody = {};
+        if (modelConfig.customBody) {
+            try {
+                customBody = JSON.parse(modelConfig.customBody);
+            } catch (e) {
+                console.error('Failed to parse custom body:', e);
+                pushErrMsg('自定义参数 JSON 格式错误');
+                return;
+            }
         }
 
         // 如果启用了多模型模式且在问答模式
@@ -2095,6 +2153,7 @@
                             signal: abortController.signal,
                             enableThinking,
                             tools: toolsForAgent,
+                            customBody, // 传递自定义参数
                             onThinkingChunk: enableThinking
                                 ? async (chunk: string) => {
                                       isThinkingPhase = true;
@@ -2341,6 +2400,7 @@
                         stream: true,
                         signal: abortController.signal,
                         enableThinking,
+                        customBody, // 传递自定义参数
                         onThinkingChunk: enableThinking
                             ? async (chunk: string) => {
                                   isThinkingPhase = true;
@@ -5414,6 +5474,19 @@
             return;
         }
 
+        // 解析自定义参数
+        let customBody = {};
+        if (modelConfig.customBody) {
+            try {
+                customBody = JSON.parse(modelConfig.customBody);
+            } catch (e) {
+                console.error('Failed to parse custom body:', e);
+                pushErrMsg('自定义参数 JSON 格式错误');
+                isLoading = false;
+                return;
+            }
+        }
+
         try {
             const enableThinking = modelConfig.capabilities?.thinking || false;
 
@@ -5427,6 +5500,7 @@
                     maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                     stream: true,
                     signal: abortController.signal,
+                    customBody,
                     enableThinking,
                     onThinkingChunk: enableThinking
                         ? async (chunk: string) => {

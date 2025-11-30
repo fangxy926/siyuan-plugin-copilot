@@ -442,6 +442,7 @@
         "namePlaceholder": "不填则使用模型ID",
         "temperature": "温度 (Temperature)",
         "maxTokens": "最大 Tokens (-1表示不限制)",
+        "customBody": "自定义参数 (JSON)",
         "searchPlaceholder": "搜索模型...",
         "add": "添加",
         "addModel": "添加模型",

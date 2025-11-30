@@ -532,6 +532,17 @@
                             />
                         </div>
                         <div class="model-config-item">
+                            <span>{t('models.customBody')} </span>
+                            <textarea
+                                class="b3-text-field"
+                                style="height: 60px; resize: vertical;"
+                                value={model.customBody || ''}
+                                placeholder={'{ "key": "value" }'}
+                                on:change={(e) =>
+                                    updateModel(model.id, 'customBody', e.currentTarget.value)}
+                            />
+                        </div>
+                        <div class="model-config-item">
                             <span>{t('models.capabilities')}</span>
                             <div class="model-capabilities">
                                 <label class="">

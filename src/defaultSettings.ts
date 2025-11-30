@@ -5,6 +5,7 @@ export interface ModelConfig {
     name: string;
     temperature: number;
     maxTokens: number;
+    customBody?: string; // 自定义请求体参数 (JSON string)
     capabilities?: {
         thinking?: boolean; // 是否支持思考模式
         vision?: boolean;   // 是否支持视觉

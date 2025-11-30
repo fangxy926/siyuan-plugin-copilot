@@ -86,6 +86,7 @@ export interface ChatOptions {
     tools?: any[]; // Agent模式的工具列表
     onToolCall?: (toolCall: ToolCall) => void; // Tool Call 回调
     onToolCallComplete?: (toolCalls: ToolCall[]) => void; // Tool Calls 完成回调
+    customBody?: any; // 自定义请求体参数
 }
 
 export interface ModelInfo {
@@ -358,7 +359,8 @@ async function chatOpenAIFormat(
         messages: formattedMessages,
         temperature: options.temperature || 0.7,
         max_tokens: options.maxTokens,
-        stream: options.stream !== false
+        stream: options.stream !== false,
+        ...options.customBody // 合并自定义参数
     };
 
     // 添加工具定义（Agent模式）

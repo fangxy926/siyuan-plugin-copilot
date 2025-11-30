@@ -443,6 +443,7 @@
         "namePlaceholder": "Leave blank to use Model ID",
         "temperature": "Temperature",
         "maxTokens": "Max Tokens (-1 for unlimited)",
+        "customBody": "Custom Body (JSON)",
         "searchPlaceholder": "Search models...",
         "add": "Add",
         "addModel": "Add Model",
