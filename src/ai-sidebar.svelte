@@ -4151,7 +4151,7 @@
 
         // 如果全局保存文档位置为空，使用当前文档路径和笔记本（优先使用当前文档的笔记本）
         if (!defaultPath) {
-            savePath = currentDocPath;
+            savePath = toRelativePath(currentDocPath);
             // 优先使用当前文档所在笔记本（如果能取得），并验证该笔记本存在于系统中；若不存在或未取得则回退到第一个笔记本
             // 只有当 currentDocNotebookId 有值时才赋值，否则保持为空，让后续逻辑处理
             if (currentDocNotebookId) {
@@ -4203,9 +4203,9 @@
     // 切换到当前文档路径
     function useCurrentDocPath() {
         if (currentDocPath && currentDocNotebookId) {
-            savePath = currentDocPath;
+            savePath = toRelativePath(currentDocPath);
             saveNotebookId = currentDocNotebookId;
-            savePathSearchKeyword = currentDocPath;
+            savePathSearchKeyword = savePath;
             savePathSearchResults = [];
             showSavePathDropdown = false;
         }
@@ -4254,10 +4254,37 @@
 
     // 选择路径
     function selectSavePath(path: string) {
-        savePath = path;
-        savePathSearchKeyword = path;
+        // `path` may come from `doc.path` (relative path) or be an hPath.
+        // Normalize to a relative path (without notebook prefix) so it won't duplicate the notebook name
+        // when used as the document path for createDocWithMd(notebook, path, ...)
+        savePath = toRelativePath(path);
+        savePathSearchKeyword = savePath;
         showSavePathDropdown = false;
         savePathSearchResults = [];
+    }
+
+    // 将 hPath（例如 "收集箱Inbox/2025/202510" 或 "/收集箱Inbox/2025/202510"）转换为相对于笔记本的路径
+    function toRelativePath(hpath: string): string {
+        if (!hpath) return '';
+        let p = String(hpath).trim();
+        // 移除开头的斜杠
+        p = p.replace(/^\/+/, '');
+        const parts = p.split('/');
+
+        // If the path is already a relative path (e.g., '2025/202510'), it shouldn't
+        // remove the first segment. Only strip the notebook name if it matches the
+        // currently selected notebook's name.
+        const currentNotebook = saveDialogNotebooks?.find(
+            n => String(n.id) === String(saveNotebookId)
+        );
+        const currentNotebookName = currentNotebook?.name;
+        if (currentNotebookName && parts[0] === currentNotebookName) {
+            parts.shift();
+            return parts.join('/');
+        }
+
+        // Otherwise return the path unchanged
+        return p;
     }
 
     // 确认保存到笔记
@@ -4374,8 +4401,9 @@
                 return;
             }
 
-            // 创建文档
-            const fullPath = `${savePath}/${docName}`.replace(/\/+/g, '/');
+            // 创建文档 - sanitize savePath to ensure it is relative (no notebook prefix)
+            const sanitizedPath = toRelativePath(savePath);
+            const fullPath = `${sanitizedPath}/${docName}`.replace(/\/+/g, '/');
             const docId = await createDocWithMd(saveNotebookId, fullPath, markdown);
 
             // 记住上次选择
@@ -7276,10 +7304,11 @@
                                             class="save-to-note-dialog__path-item"
                                             on:click={() => selectSavePath(doc.hPath)}
                                             on:keydown={e => {
-                                                if (e.key === 'Enter') selectSavePath(doc.hPath);
+                                                if (e.key === 'Enter') selectSavePath( doc.hPath);
                                             }}
                                             role="button"
                                             tabindex="0"
+                                            title={doc.hPath}
                                         >
                                             <svg class="b3-button__icon">
                                                 <use xlink:href="#iconFile"></use>
