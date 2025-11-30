@@ -4228,7 +4228,9 @@
 
             // 过滤：只显示选中笔记本中的文档
             if (results && saveNotebookId) {
-                savePathSearchResults = (results.filter(doc => doc.box === saveNotebookId) || []).map((doc: any) => ({
+                savePathSearchResults = (
+                    results.filter(doc => doc.box === saveNotebookId) || []
+                ).map((doc: any) => ({
                     ...doc,
                     // 将 hPath 规范化为相对于所选笔记本的路径（如果 hPath 包含笔记本名则去掉它）
                     hPath: toRelativePath(doc.hPath || ''),
@@ -4245,17 +4247,29 @@
             // 我们在这里尝试 SQL 查询 blocks.hpath 字段进行模糊匹配以丰富搜索结果
             const isLikelyPathFragment = /^[0-9\-\/]+$/.test(savePathSearchKeyword.trim());
 
-            if ((savePathSearchResults.length === 0 || (savePathSearchResults && savePathSearchResults.length === 0)) && isLikelyPathFragment) {
+            if (
+                (savePathSearchResults.length === 0 ||
+                    (savePathSearchResults && savePathSearchResults.length === 0)) &&
+                isLikelyPathFragment
+            ) {
                 try {
                     const kw = savePathSearchKeyword.trim().replace(/'/g, "''");
-                    const boxFilter = saveNotebookId ? ` AND box = '${String(saveNotebookId).replace(/'/g, "''")}'` : '';
+                    const boxFilter = saveNotebookId
+                        ? ` AND box = '${String(saveNotebookId).replace(/'/g, "''")}'`
+                        : '';
                     const sqlQuery = `SELECT id, path, hpath, box FROM blocks WHERE type='d' AND hpath LIKE '%${kw}%' ${boxFilter} ORDER BY updated DESC LIMIT 200`;
                     const sqlResults = await sql(sqlQuery);
                     if (sqlResults && sqlResults.length > 0) {
                         // 将 SQL 的结果映射为 searchDocs 的返回格式（hPath 和 path）
-                        const mapped = sqlResults.map((r: any) => ({ hPath: toRelativePath(r.hpath || r.hPath || ''), path: r.path, box: r.box }));
+                        const mapped = sqlResults.map((r: any) => ({
+                            hPath: toRelativePath(r.hpath || r.hPath || ''),
+                            path: r.path,
+                            box: r.box,
+                        }));
                         // 合并并去重
-                        const existingHPaths = new Set(savePathSearchResults.map((d: any) => String(d.hPath)));
+                        const existingHPaths = new Set(
+                            savePathSearchResults.map((d: any) => String(d.hPath))
+                        );
                         for (const doc of mapped) {
                             if (!existingHPaths.has(String(doc.hPath))) {
                                 savePathSearchResults.push(doc);
