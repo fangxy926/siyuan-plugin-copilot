@@ -1,4 +1,17 @@
 
+## v0.6.0 / 20251203
+
+- ✨添加思考模式快速切换按钮 [#69](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/69)
+- 🎨支持Gemini openAI格式thinking
+- 🎨支持Claude openAI格式thinking
+- 🎨数学公式居中
+- 🎨多选模型提问代码块样式优化
+- 🐛路径保存多出笔记本路径 [#58](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/58)
+- 🐛 拖动文档会错误选择其他文档 [#63](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/63)
+- 🐛代码块高亮初始化优化 [#72](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/72)
+- 🐛 多选模型回答代码块丢失高亮 [#59](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/59)
+- 🐛拖动多模型模型排序，会意外触发拖动上下文 [#70](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/70)
+
 
 ## v0.5.1 / 20251123
 - ♻️ refactor(api): 支持多种响应格式以获取模型 [#26](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/26)
