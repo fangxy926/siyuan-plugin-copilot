@@ -204,6 +204,7 @@
             "contextCountHint": "Controls the number of messages included in conversation history",
             "temperature": "Temperature",
             "temperatureHint": "Controls randomness of generated text, higher value means more random",
+            "enableTemperature": "Enable Temperature Adjustment",
             "systemPrompt": "Temporary System Prompt",
             "systemPromptPlaceholder": "Enter temporary system prompt (leave empty to use global settings)",
             "systemPromptHint": "Only effective in current session",

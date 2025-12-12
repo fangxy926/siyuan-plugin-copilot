@@ -10,6 +10,7 @@
     export let appliedSettings = {
         contextCount: 10,
         temperature: 0.7,
+        temperatureEnabled: true,
         systemPrompt: '',
     };
     export let plugin: any;
@@ -25,6 +26,7 @@
     // 模型设置（临时值，用于编辑）
     let tempContextCount = 10;
     let tempTemperature = 0.7;
+    let tempTemperatureEnabled = true; // 是否启用temperature调整
     let tempSystemPrompt = '';
 
     // 预设管理
@@ -33,6 +35,7 @@
         name: string;
         contextCount: number;
         temperature: number;
+        temperatureEnabled: boolean; // 是否启用temperature调整
         systemPrompt: string;
         createdAt: number;
     }
@@ -96,6 +99,7 @@
             name: newPresetName.trim(),
             contextCount: tempContextCount,
             temperature: tempTemperature,
+            temperatureEnabled: tempTemperatureEnabled,
             systemPrompt: tempSystemPrompt,
             createdAt: Date.now(),
         };
@@ -128,6 +132,7 @@
         if (preset) {
             tempContextCount = preset.contextCount;
             tempTemperature = preset.temperature;
+            tempTemperatureEnabled = preset.temperatureEnabled ?? true; // 兼容旧预设
             tempSystemPrompt = preset.systemPrompt;
             selectedPresetId = presetId;
             // 保存选中的预设ID
@@ -176,6 +181,7 @@
         if (preset) {
             preset.contextCount = tempContextCount;
             preset.temperature = tempTemperature;
+            preset.temperatureEnabled = tempTemperatureEnabled;
             preset.systemPrompt = tempSystemPrompt;
             await savePresetsToStorage();
             // 触发响应式更新
@@ -189,6 +195,7 @@
         dispatch('apply', {
             contextCount: tempContextCount,
             temperature: tempTemperature,
+            temperatureEnabled: tempTemperatureEnabled,
             systemPrompt: tempSystemPrompt,
         });
     }
@@ -198,6 +205,7 @@
         isOpen &&
         (tempContextCount !== appliedSettings.contextCount ||
             tempTemperature !== appliedSettings.temperature ||
+            tempTemperatureEnabled !== appliedSettings.temperatureEnabled ||
             tempSystemPrompt !== appliedSettings.systemPrompt)
     ) {
         applySettings();
@@ -210,6 +218,7 @@
                 if (
                     selectedPreset.contextCount !== tempContextCount ||
                     selectedPreset.temperature !== tempTemperature ||
+                    (selectedPreset.temperatureEnabled ?? true) !== tempTemperatureEnabled ||
                     selectedPreset.systemPrompt !== tempSystemPrompt
                 ) {
                     selectedPresetId = '';
@@ -223,6 +232,7 @@
     async function resetToAppliedSettings() {
         tempContextCount = appliedSettings.contextCount;
         tempTemperature = appliedSettings.temperature;
+        tempTemperatureEnabled = appliedSettings.temperatureEnabled ?? true;
         tempSystemPrompt = appliedSettings.systemPrompt;
 
         // 检查当前应用的设置是否与某个预设匹配
@@ -233,6 +243,8 @@
                 preset &&
                 preset.contextCount === appliedSettings.contextCount &&
                 preset.temperature === appliedSettings.temperature &&
+                (preset.temperatureEnabled ?? true) ===
+                    (appliedSettings.temperatureEnabled ?? true) &&
                 preset.systemPrompt === appliedSettings.systemPrompt
             ) {
                 // 设置匹配，保持预设选择
@@ -251,6 +263,7 @@
         const modelConfig = getCurrentModelConfig();
         tempContextCount = 10;
         tempTemperature = modelConfig?.temperature ?? 0.7;
+        tempTemperatureEnabled = true;
         tempSystemPrompt = '';
         selectedPresetId = '';
         // 清除保存的预设ID
@@ -336,6 +349,7 @@
                 // 自动应用保存的预设
                 tempContextCount = preset.contextCount;
                 tempTemperature = preset.temperature;
+                tempTemperatureEnabled = preset.temperatureEnabled ?? true;
                 tempSystemPrompt = preset.systemPrompt;
                 selectedPresetId = savedPresetId;
                 // 触发应用
@@ -416,6 +430,18 @@
                         {t('aiSidebar.modelSettings.temperature')}
                         <span class="model-settings-value">{tempTemperature.toFixed(2)}</span>
                     </label>
+                    <div class="model-settings-checkbox">
+                        <input
+                            type="checkbox"
+                            id="temperature-enabled"
+                            bind:checked={tempTemperatureEnabled}
+                            class="b3-switch"
+                        />
+                        <label for="temperature-enabled">
+                            {t('aiSidebar.modelSettings.enableTemperature') ||
+                                '启用Temperature调整'}
+                        </label>
+                    </div>
                     <input
                         type="range"
                         min="0"
@@ -423,6 +449,7 @@
                         step="0.01"
                         bind:value={tempTemperature}
                         class="b3-slider"
+                        disabled={!tempTemperatureEnabled}
                     />
                     <div class="model-settings-hint">
                         {t('aiSidebar.modelSettings.temperatureHint')}
@@ -509,9 +536,11 @@
                                                 </div>
                                                 <div class="model-settings-preset-details">
                                                     {t('aiSidebar.modelSettings.contextCount')}: {preset.contextCount}
-                                                    | {t('aiSidebar.modelSettings.temperature')}: {preset.temperature.toFixed(
-                                                        2
-                                                    )}
+                                                    {#if preset.temperatureEnabled ?? true}
+                                                        | {t(
+                                                            'aiSidebar.modelSettings.temperature'
+                                                        )}: {preset.temperature.toFixed(2)}
+                                                    {/if}
                                                 </div>
                                             </div>
                                             <div class="model-settings-preset-actions">
@@ -646,6 +675,19 @@
         font-size: 11px;
         color: var(--b3-theme-on-surface-light);
         margin-top: -4px;
+    }
+
+    .model-settings-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+
+        label {
+            font-size: 12px;
+            color: var(--b3-theme-on-surface);
+            cursor: pointer;
+        }
     }
 
     .model-settings-textarea {

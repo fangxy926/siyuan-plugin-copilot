@@ -147,6 +147,7 @@
     let tempModelSettings = {
         contextCount: 10,
         temperature: 0.7,
+        temperatureEnabled: true,
         systemPrompt: '',
     };
 
@@ -338,7 +339,9 @@
                     apiKey: providerConfig.apiKey,
                     model: modelConfig.id,
                     messages: messagesToSend,
-                    temperature: tempModelSettings.temperature,
+                    temperature: tempModelSettings.temperatureEnabled
+                        ? tempModelSettings.temperature
+                        : undefined,
                     maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                     stream: true,
                     signal: localAbort.signal,
@@ -520,7 +523,9 @@
                     apiKey: providerConfig.apiKey,
                     model: modelConfig.id,
                     messages: messagesToSend,
-                    temperature: tempModelSettings.temperature,
+                    temperature: tempModelSettings.temperatureEnabled
+                        ? tempModelSettings.temperature
+                        : undefined,
                     maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                     stream: true,
                     signal: localAbort.signal,
@@ -1113,6 +1118,7 @@
         event: CustomEvent<{
             contextCount: number;
             temperature: number;
+            temperatureEnabled: boolean;
             systemPrompt: string;
         }>
     ) {
@@ -2611,7 +2617,9 @@
                             apiKey: providerConfig.apiKey,
                             model: modelConfig.id,
                             messages: messagesToSend,
-                            temperature: tempModelSettings.temperature,
+                            temperature: tempModelSettings.temperatureEnabled
+                                ? tempModelSettings.temperature
+                                : undefined,
                             maxTokens:
                                 modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                             stream: true,
@@ -2861,7 +2869,9 @@
                         apiKey: providerConfig.apiKey,
                         model: modelConfig.id,
                         messages: messagesToSend,
-                        temperature: tempModelSettings.temperature,
+                        temperature: tempModelSettings.temperatureEnabled
+                            ? tempModelSettings.temperature
+                            : undefined,
                         maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                         stream: true,
                         signal: abortController.signal,
@@ -6629,6 +6639,12 @@
                                                         style={messageFontSize
                                                             ? `font-size: ${messageFontSize}px;`
                                                             : ''}
+                                                        on:contextmenu={e =>
+                                                            handleContextMenu(
+                                                                e,
+                                                                messageIndex + msgIndex,
+                                                                'assistant'
+                                                            )}
                                                     >
                                                         {#if response.error}
                                                             <div
@@ -7166,6 +7182,7 @@
                                     style={messageFontSize
                                         ? `font-size: ${messageFontSize}px;`
                                         : ''}
+                                    on:contextmenu={e => handleContextMenu(e, -1, 'assistant')}
                                 >
                                     {#if response.error}
                                         <div class="ai-sidebar__multi-model-card-error">
@@ -7325,6 +7342,7 @@
                                         style={messageFontSize
                                             ? `font-size: ${messageFontSize}px;`
                                             : ''}
+                                        on:contextmenu={e => handleContextMenu(e, -1, 'assistant')}
                                     >
                                         {#if response.error}
                                             <div class="ai-sidebar__multi-model-tab-panel-error">
