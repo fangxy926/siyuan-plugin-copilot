@@ -346,16 +346,31 @@
             }
         }
     });
+
+    // 计算当前按钮上要显示的预设名称
+    // 仅在显式选中某个预设（`selectedPresetId`）时显示其名称
+    $: currentPresetName = (() => {
+        if (selectedPresetId) {
+            const preset = presets.find(p => p.id === selectedPresetId);
+            if (preset) return preset.name;
+        }
+        return '';
+    })();
 </script>
 
 <div class="model-settings-button">
     <button
         bind:this={buttonElement}
-        class="b3-button b3-button--text"
+        class="b3-button b3-button--text model-settings-button__trigger"
         on:click|stopPropagation={toggleDropdown}
-        title={t('aiSidebar.modelSettings.title')}
+        title={currentPresetName || t('aiSidebar.modelSettings.title')}
     >
         <svg class="b3-button__icon"><use xlink:href="#iconEdit"></use></svg>
+        {#if currentPresetName}
+            <span class="model-settings-button__label">
+                {currentPresetName}
+            </span>
+        {/if}
     </button>
 
     {#if isOpen}
@@ -550,6 +565,23 @@
 <style lang="scss">
     .model-settings-button {
         position: relative;
+    }
+
+    .model-settings-button__trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        max-width: 200px;
+        padding-inline: 6px 8px;
+    }
+
+    .model-settings-button__label {
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+        /* 不强制设置颜色，继承父级按钮的文本颜色 */
     }
 
     .model-settings-dropdown {
