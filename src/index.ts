@@ -21,7 +21,7 @@ import {
 import { appendBlock, deleteBlock, setBlockAttrs, getBlockAttrs, pushMsg, pushErrMsg, sql, renderSprig, getChildBlocks, insertBlock, renameDocByID, prependBlock, updateBlock, createDocWithMd, getBlockKramdown, getBlockDOM } from "./api";
 import "@/index.scss";
 
-import SettingPanel from "./setting-example.svelte";
+import SettingPanel from "./SettingsPannel.svelte";
 import { getDefaultSettings } from "./defaultSettings";
 import { setPluginInstance, t } from "./utils/i18n";
 import AISidebar from "./ai-sidebar.svelte";
