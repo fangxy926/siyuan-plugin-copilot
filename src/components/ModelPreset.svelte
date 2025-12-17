@@ -61,6 +61,10 @@
     let isPresetMenuOpen = false; // 预设菜单是否打开
     let presetMenuButtonElement: HTMLElement; // 预设菜单按钮元素
     let presetMenuElement: HTMLElement; // 预设菜单元素
+    // 拖拽排序相关
+    let dragSrcIndex: number | null = null;
+    let dragOverIndex: number | null = null;
+    let dragDirection: 'above' | 'below' | null = null;
 
     // 获取当前模型配置
     function getCurrentModelConfig() {
@@ -262,6 +266,72 @@
                 }, 0);
             }
         );
+    }
+
+    // 拖拽开始
+    function handleDragStart(e: DragEvent, index: number) {
+        dragSrcIndex = index;
+        dragDirection = null;
+        try {
+            e.dataTransfer?.setData('text/plain', String(index));
+            e.dataTransfer!.effectAllowed = 'move';
+        } catch (err) {
+            // ignore
+        }
+        const el = e.currentTarget as HTMLElement | null;
+        if (el) el.classList.add('dragging');
+    }
+
+    function handleDragOver(e: DragEvent, index: number) {
+        e.preventDefault();
+        dragOverIndex = index;
+        if (dragSrcIndex !== null) {
+            if (index < dragSrcIndex) {
+                dragDirection = 'above';
+            } else if (index > dragSrcIndex) {
+                dragDirection = 'below';
+            } else {
+                dragDirection = null;
+            }
+        }
+    }
+
+    async function handleDrop(e: DragEvent, index: number) {
+        e.preventDefault();
+        if (dragSrcIndex === null) return;
+        const src = dragSrcIndex;
+        let dest = index;
+        if (src === dest) {
+            cleanupDrag();
+            return;
+        }
+
+        // 根据拖拽方向调整目标位置
+        // 如果是拖到下方，目标位置应该是 index + 1
+        if (dragDirection === 'below') {
+            dest = index + 1;
+        }
+
+        const item = presets[src];
+        presets.splice(src, 1);
+        // 如果从上往下移，目标索引在删除后会减1
+        const adjustedDest = src < dest ? dest - 1 : dest;
+        presets.splice(adjustedDest, 0, item);
+        presets = [...presets];
+        await savePresetsToStorage();
+        cleanupDrag();
+    }
+
+    function handleDragEnd() {
+        cleanupDrag();
+    }
+
+    function cleanupDrag() {
+        dragSrcIndex = null;
+        dragOverIndex = null;
+        dragDirection = null;
+        const els = document.querySelectorAll('.model-settings-preset-menu-preset.dragging');
+        els.forEach(el => el.classList.remove('dragging'));
     }
 
     // 更新预设
@@ -618,8 +688,22 @@
 
                                 <!-- 预设列表 -->
                                 {#if presets.length > 0}
-                                    {#each presets as preset}
-                                        <div class="model-settings-preset-menu-preset">
+                                    {#each presets as preset, index}
+                                        <div
+                                            class="model-settings-preset-menu-preset"
+                                            draggable="true"
+                                            on:dragstart|stopPropagation={e =>
+                                                handleDragStart(e, index)}
+                                            on:dragover|preventDefault|stopPropagation={e =>
+                                                handleDragOver(e, index)}
+                                            on:drop|stopPropagation={e => handleDrop(e, index)}
+                                            on:dragend={handleDragEnd}
+                                            class:drag-over={dragOverIndex === index}
+                                            class:drag-over-above={dragOverIndex === index &&
+                                                dragDirection === 'above'}
+                                            class:drag-over-below={dragOverIndex === index &&
+                                                dragDirection === 'below'}
+                                        >
                                             <div class="model-settings-preset-menu-preset-main">
                                                 <div
                                                     class="model-settings-preset-menu-preset-info"
@@ -1082,15 +1166,52 @@
     }
 
     .model-settings-preset-menu-preset {
+        position: relative;
         display: flex;
         flex-direction: column;
         padding: 8px;
         border-radius: 4px;
         transition: background 0.2s;
+        cursor: grab;
 
         &:hover {
             background: var(--b3-theme-surface);
         }
+
+        &:active {
+            cursor: grabbing;
+        }
+
+        &.dragging {
+            opacity: 0.5;
+        }
+    }
+
+    .model-settings-preset-menu-preset.drag-over {
+        border: 1px dashed var(--b3-theme-primary);
+        background: var(--b3-theme-surface);
+    }
+
+    .model-settings-preset-menu-preset.drag-over-above::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--b3-theme-primary);
+        z-index: 1;
+    }
+
+    .model-settings-preset-menu-preset.drag-over-below::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--b3-theme-primary);
+        z-index: 1;
     }
 
     .model-settings-preset-menu-preset-main {
