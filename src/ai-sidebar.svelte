@@ -6753,15 +6753,7 @@
         </div>
     </div>
 
-    <div
-        class="ai-sidebar__messages"
-        class:ai-sidebar__messages--drag-over={isDragOver}
-        bind:this={messagesContainer}
-        on:dragover={handleDragOver}
-        on:dragleave={handleDragLeave}
-        on:drop={handleDrop}
-        on:scroll={handleScroll}
-    >
+    <div class="ai-sidebar__messages" bind:this={messagesContainer} on:scroll={handleScroll}>
         {#each messageGroups as group, groupIndex (groupIndex)}
             {@const firstMessage = group.messages[0]}
             {@const messageIndex = group.startIndex}
@@ -7710,74 +7702,80 @@
         {/if}
     </div>
 
+    <!-- 上下文文档和附件列表 -->
+    {#if contextDocuments.length > 0 || currentAttachments.length > 0}
+        <div
+            class="ai-sidebar__context-docs"
+            class:ai-sidebar__context-docs--drag-over={isDragOver}
+            on:dragover={handleDragOver}
+            on:dragleave={handleDragLeave}
+            on:drop={handleDrop}
+        >
+            <div class="ai-sidebar__context-docs-title">📎 {t('aiSidebar.context.content')}</div>
+            <div class="ai-sidebar__context-docs-list">
+                <!-- 显示上下文文档 -->
+                {#each contextDocuments as doc (doc.id)}
+                    <div class="ai-sidebar__context-doc-item">
+                        <button
+                            class="ai-sidebar__context-doc-remove"
+                            on:click={() => removeContextDocument(doc.id)}
+                            title="移除文档"
+                        >
+                            ×
+                        </button>
+                        <button
+                            class="ai-sidebar__context-doc-link"
+                            on:click={() => openDocument(doc.id)}
+                            title="点击查看文档"
+                        >
+                            📄 {doc.title}
+                        </button>
+                        <button
+                            class="b3-button b3-button--text ai-sidebar__context-doc-copy"
+                            on:click={() => copyMessage(doc.content || '')}
+                            title={t('aiSidebar.actions.copyMessage')}
+                        >
+                            <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                        </button>
+                    </div>
+                {/each}
 
-        <!-- 上下文文档和附件列表 -->
-        {#if contextDocuments.length > 0 || currentAttachments.length > 0}
-            <div class="ai-sidebar__context-docs">
-                <div class="ai-sidebar__context-docs-title">📎 {t('aiSidebar.context.content')}</div>
-                <div class="ai-sidebar__context-docs-list">
-                    <!-- 显示上下文文档 -->
-                    {#each contextDocuments as doc (doc.id)}
-                        <div class="ai-sidebar__context-doc-item">
-                            <button
-                                class="ai-sidebar__context-doc-remove"
-                                on:click={() => removeContextDocument(doc.id)}
-                                title="移除文档"
-                            >
-                                ×
-                            </button>
-                            <button
-                                class="ai-sidebar__context-doc-link"
-                                on:click={() => openDocument(doc.id)}
-                                title="点击查看文档"
-                            >
-                                📄 {doc.title}
-                            </button>
-                            <button
-                                class="b3-button b3-button--text ai-sidebar__context-doc-copy"
-                                on:click={() => copyMessage(doc.content || '')}
-                                title={t('aiSidebar.actions.copyMessage')}
-                            >
-                                <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
-                            </button>
-                        </div>
-                    {/each}
-
-                    <!-- 显示当前附件 -->
-                    {#each currentAttachments as attachment, index}
-                        <div class="ai-sidebar__context-doc-item">
-                            <button
-                                class="ai-sidebar__context-doc-remove"
-                                on:click={() => removeAttachment(index)}
-                                title="移除附件"
-                            >
-                                ×
-                            </button>
-                            {#if attachment.type === 'image'}
-                                <img
-                                    src={attachment.data}
-                                    alt={attachment.name}
-                                    class="ai-sidebar__context-attachment-preview"
-                                    title={attachment.name}
-                                />
-                                <span class="ai-sidebar__context-doc-name" title={attachment.name}>
-                                    🖼️ {attachment.name}
-                                </span>
-                            {:else}
-                                <svg class="ai-sidebar__context-attachment-icon">
-                                    <use xlink:href="#iconFile"></use>
-                                </svg>
-                                <span class="ai-sidebar__context-doc-name" title={attachment.name}>
-                                    📄 {attachment.name}
-                                </span>
-                            {/if}
-                        </div>
-                    {/each}
-                </div>
+                <!-- 显示当前附件 -->
+                {#each currentAttachments as attachment, index}
+                    <div class="ai-sidebar__context-doc-item">
+                        <button
+                            class="ai-sidebar__context-doc-remove"
+                            on:click={() => removeAttachment(index)}
+                            title="移除附件"
+                        >
+                            ×
+                        </button>
+                        {#if attachment.type === 'image'}
+                            <img
+                                src={attachment.data}
+                                alt={attachment.name}
+                                class="ai-sidebar__context-attachment-preview"
+                                title={attachment.name}
+                            />
+                            <span class="ai-sidebar__context-doc-name" title={attachment.name}>
+                                🖼️ {attachment.name}
+                            </span>
+                        {:else}
+                            <svg class="ai-sidebar__context-attachment-icon">
+                                <use xlink:href="#iconFile"></use>
+                            </svg>
+                            <span class="ai-sidebar__context-doc-name" title={attachment.name}>
+                                📄 {attachment.name}
+                            </span>
+                        {/if}
+                    </div>
+                {/each}
             </div>
-        {/if}
+        </div>
+    {/if}
     <div
         class="ai-sidebar__input-container"
+        class:ai-sidebar__input-container--drag-over={isDragOver}
         bind:this={inputContainer}
         on:dragover={handleDragOver}
         on:dragleave={handleDragLeave}
@@ -8762,6 +8760,19 @@
         flex-shrink: 0;
     }
 
+    .ai-sidebar__context-docs--drag-over {
+        background: rgba(0, 120, 212, 0.06);
+        border: 1px dashed rgba(0, 120, 212, 0.4);
+        border-radius: 6px;
+        padding: 6px;
+    }
+
+    .ai-sidebar__input-container--drag-over {
+        background: rgba(0, 120, 212, 0.04);
+        border-radius: 6px;
+        box-shadow: inset 0 0 0 1px rgba(0, 120, 212, 0.06);
+    }
+
     .ai-sidebar__context-docs-title {
         font-size: 12px;
         font-weight: 600;
@@ -9710,7 +9721,9 @@
         color: var(--b3-theme-on-surface-light);
         cursor: pointer;
         border-radius: 4px;
-        transition: background-color 0.2s, color 0.2s;
+        transition:
+            background-color 0.2s,
+            color 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
