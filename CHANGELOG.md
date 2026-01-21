@@ -1,4 +1,8 @@
 
+## v1.1.0 / 20260121
+- 🎨 支持公式复制 ([#102](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/102))，感谢[@lisontowind](https://github.com/lisontowind)
+
+
 ## v1.0.0 / 20260118
 - 🎨 预设多选模型支持设置模型顺序
 - 🎨 输入框禁用拼写检查
@@ -15,7 +19,6 @@
 - 🐛 修复部分回复无法显示问题 ([#89](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/89))
 
 
-Co-authored-by: Xinjie <xinjie_zhou@163.com>
 
 ## v0.9.0 / 20251217 
 - 🎨 agent添加数据库工具 [#60](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/60)
