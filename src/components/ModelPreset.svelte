@@ -1691,7 +1691,7 @@
 
     .model-settings-model-list {
         margin-top: 12px;
-        max-height: 200px;
+        max-height: 500px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
