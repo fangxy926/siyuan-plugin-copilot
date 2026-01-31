@@ -234,7 +234,9 @@
             "model": "模型",
             "multiModel": "多模型",
             "presetMenu": "预设管理",
-            "enableThinking": "思考"
+            "enableThinking": "思考",
+            "createNewPreset": "新建预设",
+            "editPreset": "编辑预设"
         },
         "input": {
             "placeholder": "输入消息... (可拖入文档、块或粘贴图片)"
@@ -449,7 +451,8 @@
         "configComplete": "加载配置文件完成",
         "expand": "展开",
         "collapse": "折叠",
-        "required": "必填"
+        "required": "必填",
+        "back": "返回"
     },
     "toolbar": {
         "aiChat": "AI 问答",
@@ -479,8 +482,9 @@
         "added": "已添加的模型",
         "alreadyAdded": "已添加",
         "capabilities": "模型能力",
-        "thinking": "思考模式 (Thinking)",
+        "thinking": "思考",
         "vision": "视觉",
+        "imageGeneration": "生图",
         "noMatch": "没有找到匹配的模型",
         "fetching": "正在获取模型列表..."
     },

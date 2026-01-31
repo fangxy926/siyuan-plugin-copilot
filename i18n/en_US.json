@@ -235,7 +235,9 @@
             "model": "Model",
             "multiModel": "Multi-Model",
             "presetMenu": "Preset Menu",
-            "enableThinking": "Thinking"
+            "enableThinking": "Thinking",
+            "createNewPreset": "New Preset",
+            "editPreset": "Edit Preset"
         },
         "input": {
             "placeholder": "Type a message... (drag docs, blocks or paste images)"
@@ -482,6 +484,7 @@
         "capabilities": "Model Capabilities",
         "thinking": "Thinking Mode",
         "vision": "Vision",
+        "imageGeneration": "Image Gen",
         "noMatch": "No matching models found",
         "fetching": "Fetching model list..."
     },
