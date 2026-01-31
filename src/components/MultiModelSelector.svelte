@@ -26,7 +26,18 @@
     };
 
     let expandedProviders: Set<string> = new Set();
-    let selectedModelSet: Set<string> = new Set();
+    // 移除 selectedModelSet，因为现在允许重复选择同一个模型
+
+    // 模型搜索筛选
+    let modelSearchQuery = '';
+
+    // 当有搜索内容时，自动展开相关的provider分组
+    $: if (modelSearchQuery.trim()) {
+        filteredProviders.forEach(provider => {
+            expandedProviders.add(provider.id);
+        });
+        expandedProviders = expandedProviders; // 触发更新
+    }
 
     // DOM references for positioning
     let buttonEl: HTMLElement | null = null;
@@ -49,10 +60,7 @@
         return { provider, modelId };
     }
 
-    // 初始化已选择的模型集合
-    $: {
-        selectedModelSet = new Set(selectedModels.map(m => getModelKey(m.provider, m.modelId)));
-    }
+    // 移除 selectedModelSet 的初始化，因为现在允许重复选择同一个模型
 
     function getProviderList(): ProviderInfo[] {
         const list: ProviderInfo[] = [];
@@ -85,6 +93,32 @@
         return list;
     }
 
+    // 响应式过滤后的提供商列表（支持空格分隔的 AND 搜索）
+    $: filteredProviders = (() => {
+        // 确保依赖于 providers
+        const _providers = providers;
+        const query = modelSearchQuery.trim().toLowerCase();
+        if (!query) {
+            return getProviderList();
+        } else {
+            // 支持空格分隔的 AND 搜索
+            const searchTerms = query.split(/\s+/).filter(term => term.length > 0);
+            return getProviderList()
+                .map(provider => ({
+                    ...provider,
+                    config: {
+                        ...provider.config,
+                        models: provider.config.models.filter(model => {
+                            const modelText = `${model.name} ${model.id} ${provider.name}`.toLowerCase();
+                            // 所有搜索词都必须匹配（AND逻辑）
+                            return searchTerms.every(term => modelText.includes(term));
+                        })
+                    }
+                }))
+                .filter(provider => provider.config.models.length > 0);
+        }
+    })();
+
     function toggleProvider(providerId: string) {
         if (expandedProviders.has(providerId)) {
             expandedProviders.delete(providerId);
@@ -94,21 +128,9 @@
         expandedProviders = expandedProviders;
     }
 
-    function toggleModel(provider: string, modelId: string) {
-        const key = getModelKey(provider, modelId);
-
-        if (selectedModelSet.has(key)) {
-            selectedModelSet.delete(key);
-            // 从selectedModels中移除
-            selectedModels = selectedModels.filter(
-                m => !(m.provider === provider && m.modelId === modelId)
-            );
-        } else {
-            selectedModelSet.add(key);
-            // 添加到selectedModels
-            selectedModels = [...selectedModels, { provider, modelId }];
-        }
-        selectedModelSet = selectedModelSet;
+    function addModel(provider: string, modelId: string) {
+        // 总是添加模型，允许重复选择
+        selectedModels = [...selectedModels, { provider, modelId }];
         dispatch('change', selectedModels);
     }
 
@@ -581,7 +603,23 @@
             {/if}
 
             <div class="multi-model-selector__tree">
-                {#each getProviderList() as provider}
+                <!-- 模型搜索框 -->
+                <div class="multi-model-selector__search">
+                    <input
+                        type="text"
+                        class="b3-text-field"
+                        placeholder={t('multiModel.searchModels') || '搜索模型'}
+                        bind:value={modelSearchQuery}
+                    />
+                </div>
+
+                {#if modelSearchQuery.trim() && filteredProviders.length === 0}
+                    <div class="multi-model-selector__no-results">
+                        {t('multiModel.noResults') || '无匹配结果'}
+                    </div>
+                {/if}
+
+                {#each filteredProviders as provider}
                     <div class="multi-model-selector__provider">
                         <div
                             class="multi-model-selector__provider-header"
@@ -606,23 +644,17 @@
                         {#if expandedProviders.has(provider.id)}
                             <div class="multi-model-selector__models">
                                 {#each provider.config.models as model}
-                                    {@const modelKey = getModelKey(provider.id, model.id)}
-                                    {@const isSelected = selectedModelSet.has(modelKey)}
                                     <div
                                         class="multi-model-selector__model"
                                         role="button"
                                         tabindex="0"
-                                        class:multi-model-selector__model--selected={isSelected}
-                                        on:click={() => toggleModel(provider.id, model.id)}
+                                        on:click={() => addModel(provider.id, model.id)}
                                         on:keydown={() => {}}
                                     >
-                                        <div class="multi-model-selector__checkbox">
-                                            <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                on:click|stopPropagation={() =>
-                                                    toggleModel(provider.id, model.id)}
-                                            />
+                                        <div class="multi-model-selector__add-button">
+                                            <svg class="multi-model-selector__add-icon">
+                                                <use xlink:href="#iconAdd"></use>
+                                            </svg>
                                         </div>
                                         <div class="multi-model-selector__model-info">
                                             <span class="multi-model-selector__model-name">
@@ -638,9 +670,7 @@
                         {/if}
                     </div>
                 {/each}
-                {#if getProviderList().length === 0}
-                    <div class="multi-model-selector__empty">{t('multiModel.noModels')}</div>
-                {/if}
+                <!-- 移除空状态显示，当没有模型时不显示任何内容 -->
             </div>
         </div>
     {/if}
@@ -859,7 +889,25 @@
     .multi-model-selector__tree {
         padding: 8px;
         overflow-y: auto;
+        max-height: 500px;
         flex: 1;
+    }
+
+    .multi-model-selector__search {
+        padding: 8px 0 12px 0;
+    }
+
+    .multi-model-selector__search input {
+        width: 100%;
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+
+    .multi-model-selector__no-results {
+        padding: 16px;
+        text-align: center;
+        color: var(--b3-theme-on-surface-light);
+        font-size: 12px;
     }
 
     .multi-model-selector__provider {
@@ -919,19 +967,30 @@
         &:hover {
             background: var(--b3-theme-surface);
         }
+    }
 
-        &--selected {
-            background: var(--b3-theme-primary-lightest);
-            border-left-color: var(--b3-theme-primary);
+    .multi-model-selector__add-button {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--b3-theme-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+            background: var(--b3-theme-primary-light);
+            transform: scale(1.1);
         }
     }
 
-    .multi-model-selector__checkbox {
-        flex-shrink: 0;
-
-        input[type='checkbox'] {
-            cursor: pointer;
-        }
+    .multi-model-selector__add-icon {
+        width: 12px;
+        height: 12px;
+        fill: white;
     }
 
     .multi-model-selector__model-info {

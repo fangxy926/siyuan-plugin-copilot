@@ -561,6 +561,8 @@
         "enabled": "Multi-Model",
         "enable": "Enable Multi-Model",
         "selectModels": "Select Multiple Models",
+        "searchModels": "Search models",
+        "noResults": "No matching results",
         "selectAll": "Select All",
         "deselectAll": "Deselect All",
         "selected": "Selected",

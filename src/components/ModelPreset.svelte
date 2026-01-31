@@ -126,11 +126,18 @@
         const terms = q.split(/\s+/).filter(Boolean);
         return presets.filter(preset => {
             const hay = (
-                (preset.name || '') + ' ' +
-                (preset.systemPrompt || '') + ' ' +
-                (preset.chatMode || '') + ' ' +
-                (preset.selectedModels || []).map(m => getModelDisplayName(m.provider, m.modelId)).join(' ') + ' ' +
-                (preset.selectedModels || []).map(m => m.provider).join(' ') + ' ' +
+                (preset.name || '') +
+                ' ' +
+                (preset.systemPrompt || '') +
+                ' ' +
+                (preset.chatMode || '') +
+                ' ' +
+                (preset.selectedModels || [])
+                    .map(m => getModelDisplayName(m.provider, m.modelId))
+                    .join(' ') +
+                ' ' +
+                (preset.selectedModels || []).map(m => m.provider).join(' ') +
+                ' ' +
                 (preset.selectedModels || []).map(m => m.modelId).join(' ')
             ).toLowerCase();
             return terms.every(term => hay.includes(term));
@@ -952,86 +959,98 @@
                                     class:drag-over-below={dragOverIndex === index &&
                                         dragDirection === 'below'}
                                 >
-                                <div
-                                    class="model-settings-preset-list-item-info"
-                                    on:click={() => selectPreset(preset.id)}
-                                    role="button"
-                                    tabindex="0"
-                                    on:keydown={e => e.key === 'Enter' && selectPreset(preset.id)}
-                                >
-                                    {#if selectedPresetId === preset.id}
-                                        <svg class="model-settings-preset-selected-icon">
-                                            <use xlink:href="#iconCheck"></use>
-                                        </svg>
-                                    {:else}
-                                        <div class="model-settings-preset-empty-icon"></div>
-                                    {/if}
-                                    <div class="model-settings-preset-list-item-content">
-                                        <span class="preset-name">{preset.name}</span>
-                                        <div class="model-settings-preset-details">
-                                            {t('aiSidebar.modelSettings.contextCount')}: {preset.contextCount}
-                                            {#if preset.temperatureEnabled ?? true}
-                                                | {t('aiSidebar.modelSettings.temperature')}: {preset.temperature.toFixed(
-                                                    2
-                                                )}
-                                            {/if}
-                                            {#if preset.chatMode}
-                                                | {t('aiSidebar.modelSettings.chatMode')}: {t(
-                                                    `aiSidebar.mode.${preset.chatMode}`
-                                                ) || preset.chatMode}
-                                            {/if}
-                                            {#if preset.modelSelectionEnabled && preset.selectedModels && preset.selectedModels.length > 0}
-                                                <br />
-                                                <span class="model-settings-preset-models">
-                                                    {#if preset.enableMultiModel}
-                                                        {t('aiSidebar.modelSettings.multiModel') ||
-                                                            '多模型'}:
-                                                    {:else}
-                                                        {t('aiSidebar.modelSettings.model') ||
-                                                            '模型'}:
-                                                    {/if}
-                                                    {preset.selectedModels
-                                                        .map(m => {
-                                                            const provider =
-                                                                providers[m.provider] ||
-                                                                providers.customProviders?.find(
-                                                                    p => p.id === m.provider
-                                                                );
-                                                            const model = provider?.models?.find(
-                                                                model => model.id === m.modelId
-                                                            );
-                                                            return model?.name || m.modelId;
-                                                        })
-                                                        .join(', ')}
-                                                </span>
-                                            {/if}
+                                    <div
+                                        class="model-settings-preset-list-item-info"
+                                        on:click={() => selectPreset(preset.id)}
+                                        role="button"
+                                        tabindex="0"
+                                        on:keydown={e =>
+                                            e.key === 'Enter' && selectPreset(preset.id)}
+                                    >
+                                        {#if selectedPresetId === preset.id}
+                                            <svg class="model-settings-preset-selected-icon">
+                                                <use xlink:href="#iconCheck"></use>
+                                            </svg>
+                                        {:else}
+                                            <div class="model-settings-preset-empty-icon"></div>
+                                        {/if}
+                                        <div class="model-settings-preset-list-item-content">
+                                            <span class="preset-name">{preset.name}</span>
+                                            <div class="model-settings-preset-details">
+                                                {t('aiSidebar.modelSettings.contextCount')}: {preset.contextCount}
+                                                {#if preset.temperatureEnabled ?? true}
+                                                    | {t('aiSidebar.modelSettings.temperature')}: {preset.temperature.toFixed(
+                                                        2
+                                                    )}
+                                                {/if}
+                                                {#if preset.chatMode}
+                                                    | {t('aiSidebar.modelSettings.chatMode')}: {t(
+                                                        `aiSidebar.mode.${preset.chatMode}`
+                                                    ) || preset.chatMode}
+                                                {/if}
+                                                {#if preset.modelSelectionEnabled && preset.selectedModels && preset.selectedModels.length > 0}
+                                                    <br />
+                                                    <span class="model-settings-preset-models">
+                                                        {#if preset.enableMultiModel}
+                                                            {t(
+                                                                'aiSidebar.modelSettings.multiModel'
+                                                            ) || '多模型'}:
+                                                        {:else}
+                                                            {t('aiSidebar.modelSettings.model') ||
+                                                                '模型'}:
+                                                        {/if}
+                                                        {(() => {
+                                                            // 计算每个模型的出现次数
+                                                            const modelCounts = {};
+                                                            preset.selectedModels.forEach(m => {
+                                                                const provider =
+                                                                    providers[m.provider] ||
+                                                                    providers.customProviders?.find(
+                                                                        p => p.id === m.provider
+                                                                    );
+                                                                const model =
+                                                                    provider?.models?.find(
+                                                                        model =>
+                                                                            model.id === m.modelId
+                                                                    );
+                                                                const modelName = model?.name || m.modelId;
+                                                                modelCounts[modelName] = (modelCounts[modelName] || 0) + 1;
+                                                            });
+
+                                                            // 格式化显示：模型名 × 次数
+                                                            return Object.entries(modelCounts)
+                                                                .map(([name, count]) => count > 1 ? `${name} × ${count}` : name)
+                                                                .join(', ');
+                                                        })()}
+                                                    </span>
+                                                {/if}
+                                            </div>
                                         </div>
                                     </div>
+                                    <div class="model-settings-preset-list-item-actions">
+                                        <button
+                                            class="b3-button b3-button--text"
+                                            on:click|stopPropagation={() => editPreset(preset.id)}
+                                            title={t('aiSidebar.modelSettings.editPreset') ||
+                                                '编辑预设'}
+                                        >
+                                            <svg class="b3-button__icon">
+                                                <use xlink:href="#iconEdit"></use>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            class="b3-button b3-button--text"
+                                            on:click|stopPropagation={() => deletePreset(preset.id)}
+                                            title={t('aiSidebar.modelSettings.deletePreset')}
+                                        >
+                                            <svg class="b3-button__icon">
+                                                <use xlink:href="#iconTrashcan"></use>
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="model-settings-preset-list-item-actions">
-                                    <button
-                                        class="b3-button b3-button--text"
-                                        on:click|stopPropagation={() => editPreset(preset.id)}
-                                        title={t('aiSidebar.modelSettings.editPreset') ||
-                                            '编辑预设'}
-                                    >
-                                        <svg class="b3-button__icon">
-                                            <use xlink:href="#iconEdit"></use>
-                                        </svg>
-                                    </button>
-                                    <button
-                                        class="b3-button b3-button--text"
-                                        on:click|stopPropagation={() => deletePreset(preset.id)}
-                                        title={t('aiSidebar.modelSettings.deletePreset')}
-                                    >
-                                        <svg class="b3-button__icon">
-                                            <use xlink:href="#iconTrashcan"></use>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        {/each}
-                    </div>
+                            {/each}
+                        </div>
                     {:else if presetSearchQuery.trim()}
                         <div class="model-settings-preset-list-empty">
                             {t('aiSidebar.modelSettings.noResults') || '无匹配结果'}
@@ -1068,10 +1087,7 @@
                             {t('aiSidebar.modelSettings.savePreset') || '保存预设'}
                         </button>
                     {:else}
-                        <button
-                            class="b3-button b3-button--primary"
-                            on:click={saveAsPreset}
-                        >
+                        <button class="b3-button b3-button--primary" on:click={saveAsPreset}>
                             {t('aiSidebar.modelSettings.savePreset') || '保存预设'}
                         </button>
                     {/if}
@@ -1390,48 +1406,49 @@
                                 {#each filteredModels as model}
                                     <div class="model-settings-model-item">
                                         <div class="model-settings-model-item-main">
-                                            <input
-                                                type={tempEnableMultiModel ? 'checkbox' : 'radio'}
-                                                id="model-{model.provider}-{model.modelId}"
-                                                name="preset-model-selection"
-                                                checked={tempSelectedModels.some(
-                                                    m =>
-                                                        m.provider === model.provider &&
-                                                        m.modelId === model.modelId
-                                                )}
-                                                on:change={e => {
-                                                    if (tempEnableMultiModel) {
-                                                        if (e.currentTarget.checked) {
-                                                            tempSelectedModels = [
-                                                                ...tempSelectedModels,
-                                                                {
-                                                                    provider: model.provider,
-                                                                    modelId: model.modelId,
-                                                                },
-                                                            ];
-                                                        } else {
-                                                            tempSelectedModels =
-                                                                tempSelectedModels.filter(
-                                                                    m =>
-                                                                        !(
-                                                                            m.provider ===
-                                                                                model.provider &&
-                                                                            m.modelId ===
-                                                                                model.modelId
-                                                                        )
-                                                                );
-                                                        }
-                                                    } else {
+                                            {#if tempEnableMultiModel}
+                                                <!-- 多模型模式：使用+按钮 -->
+                                                <button
+                                                    class="model-settings-add-button"
+                                                    type="button"
+                                                    on:click={() => {
+                                                        tempSelectedModels = [
+                                                            ...tempSelectedModels,
+                                                            {
+                                                                provider: model.provider,
+                                                                modelId: model.modelId,
+                                                            },
+                                                        ];
+                                                        applySettings();
+                                                    }}
+                                                    title="添加此模型"
+                                                >
+                                                    <svg class="model-settings-add-icon">
+                                                        <use xlink:href="#iconAdd"></use>
+                                                    </svg>
+                                                </button>
+                                            {:else}
+                                                <!-- 单模型模式：使用radio按钮 -->
+                                                <input
+                                                    type="radio"
+                                                    id="model-{model.provider}-{model.modelId}"
+                                                    name="preset-model-selection"
+                                                    checked={tempSelectedModels.some(
+                                                        m =>
+                                                            m.provider === model.provider &&
+                                                            m.modelId === model.modelId
+                                                    )}
+                                                    on:change={() => {
                                                         tempSelectedModels = [
                                                             {
                                                                 provider: model.provider,
                                                                 modelId: model.modelId,
                                                             },
                                                         ];
-                                                    }
-                                                    applySettings();
-                                                }}
-                                            />
+                                                        applySettings();
+                                                    }}
+                                                />
+                                            {/if}
                                             <label for="model-{model.provider}-{model.modelId}">
                                                 <span class="model-provider-name">
                                                     {model.providerName}
@@ -1771,6 +1788,36 @@
                 cursor: not-allowed;
             }
         }
+    }
+
+    .model-settings-add-button {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--b3-theme-primary);
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-right: 8px;
+
+        &:hover {
+            background: var(--b3-theme-primary-light);
+            transform: scale(1.1);
+        }
+
+        &:active {
+            transform: scale(0.95);
+        }
+    }
+
+    .model-settings-add-icon {
+        width: 14px;
+        height: 14px;
+        fill: white;
     }
 
     .model-settings-textarea {

@@ -564,6 +564,8 @@
         "enabled": "多模型",
         "enable": "启用多模型",
         "selectModels": "选择多个模型",
+        "searchModels": "搜索模型",
+        "noResults": "无匹配结果",
         "selectAll": "全选",
         "deselectAll": "取消全选",
         "selected": "已选择",
