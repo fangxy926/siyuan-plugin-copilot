@@ -346,7 +346,7 @@
                     messages: messagesToSend,
                     temperature: tempModelSettings.temperatureEnabled
                         ? tempModelSettings.temperature
-                        : undefined,
+                        : modelConfig.temperature,
                     maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                     stream: true,
                     signal: localAbort.signal,
@@ -536,7 +536,7 @@
                     messages: messagesToSend,
                     temperature: tempModelSettings.temperatureEnabled
                         ? tempModelSettings.temperature
-                        : undefined,
+                        : modelConfig.temperature,
                     maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                     stream: true,
                     signal: localAbort.signal,
@@ -1720,7 +1720,9 @@
                         apiKey: providerConfig.apiKey,
                         model: modelConfig.id,
                         messages: messagesToSend,
-                        temperature: tempModelSettings.temperature,
+                        temperature: tempModelSettings.temperatureEnabled
+                            ? tempModelSettings.temperature
+                            : modelConfig.temperature,
                         maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                         stream: true,
                         signal: abortController.signal,
@@ -2906,7 +2908,7 @@
                             messages: messagesToSend,
                             temperature: tempModelSettings.temperatureEnabled
                                 ? tempModelSettings.temperature
-                                : undefined,
+                                : modelConfig.temperature,
                             maxTokens:
                                 modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                             stream: true,
@@ -3180,7 +3182,7 @@
                         messages: messagesToSend,
                         temperature: tempModelSettings.temperatureEnabled
                             ? tempModelSettings.temperature
-                            : undefined,
+                            : modelConfig.temperature,
                         maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                         stream: true,
                         signal: abortController.signal,

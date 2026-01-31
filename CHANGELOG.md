@@ -1,3 +1,5 @@
+## v1.2.0 / 20260131
+- 
 
 ## v1.1.0 / 20260121
 - 🎨 支持公式复制 ([#102](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/102))，感谢[@lisontowind](https://github.com/lisontowind)
