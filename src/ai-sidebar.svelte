@@ -173,6 +173,58 @@
     let currentImageSrc = '';
     let currentImageName = '';
 
+    // 消息内容显示缓存（存储每个消息的显示内容，键为content的哈希）
+    const messageDisplayCache = new Map<string, { loading: boolean; content: string }>();
+    
+    // 获取content的简单哈希（用作缓存键）
+    function getContentHash(content: string): string {
+        let hash = 0;
+        for (let i = 0; i < content.length; i++) {
+            const char = content.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return hash.toString();
+    }
+    
+    // 获取用于显示的消息内容（将 assets 路径替换为 blob URL）
+    function getDisplayContent(content: string | MessageContent[]): string {
+        const textContent = typeof content === 'string' ? content : getMessageText(content);
+        
+        // 检查是否包含 assets 路径
+        if (!textContent.includes('/data/storage/petal/siyuan-plugin-copilot/assets/')) {
+            return formatMessage(textContent);
+        }
+        
+        // 使用content本身的哈希作为缓存键
+        const cacheKey = getContentHash(textContent);
+        
+        // 如果缓存中存在且已加载完成，直接返回
+        const cached = messageDisplayCache.get(cacheKey);
+        if (cached && !cached.loading) {
+            return cached.content;
+        }
+        
+        // 如果正在加载，返回原始内容
+        if (cached && cached.loading) {
+            return formatMessage(textContent);
+        }
+        
+        // 标记为加载中
+        messageDisplayCache.set(cacheKey, { loading: true, content: '' });
+        
+        // 异步加载assets图片
+        replaceAssetPathsWithBlob(textContent).then(processedContent => {
+            const formattedContent = formatMessage(processedContent);
+            messageDisplayCache.set(cacheKey, { loading: false, content: formattedContent });
+            // 触发重新渲染
+            messages = [...messages];
+        });
+        
+        // 先返回原始内容
+        return formatMessage(textContent);
+    }
+
     // 打开图片查看器
     function openImageViewer(src: string, name: string) {
         currentImageSrc = src;
@@ -398,7 +450,7 @@
                     : undefined,
         };
 
-        const messagesToSend = prepareMessagesForAI(
+        const messagesToSend = await prepareMessagesForAI(
             messages,
             contextDocumentsWithLatestContent,
             userContent,
@@ -463,7 +515,10 @@
                     },
                     onComplete: async (text: string) => {
                         if (multiModelResponses[index]) {
-                            multiModelResponses[index].content = convertLatexToMarkdown(text);
+                            const convertedText = convertLatexToMarkdown(text);
+                            // 处理content中的base64图片，保存为assets文件
+                            const processedContent = await saveBase64ImagesInContent(convertedText);
+                            multiModelResponses[index].content = processedContent;
                             multiModelResponses[index].thinking = thinking;
                             multiModelResponses[index].isLoading = false;
                             if (thinking && !multiModelResponses[index].thinkingCollapsed) {
@@ -589,7 +644,7 @@
                     : undefined,
         };
 
-        const messagesToSend = prepareMessagesForAI(
+        const messagesToSend = await prepareMessagesForAI(
             messages,
             contextDocumentsWithLatestContent,
             userContent,
@@ -650,8 +705,10 @@
                         messages = [...messages];
                     },
                     onComplete: async (text: string) => {
-                        msg.multiModelResponses[responseIndex].content =
-                            convertLatexToMarkdown(text);
+                        const convertedText = convertLatexToMarkdown(text);
+                        // 处理content中的base64图片，保存为assets文件
+                        const processedContent = await saveBase64ImagesInContent(convertedText);
+                        msg.multiModelResponses[responseIndex].content = processedContent;
                         msg.multiModelResponses[responseIndex].thinking = thinking;
                         msg.multiModelResponses[responseIndex].isLoading = false;
                         if (thinking && !msg.multiModelResponses[responseIndex].thinkingCollapsed) {
@@ -1751,7 +1808,7 @@
                 ? lastUserMessage.contextDocuments
                 : contextDocumentsWithLatestContent;
 
-        const messagesToSend = prepareMessagesForAI(
+        const messagesToSend = await prepareMessagesForAI(
             messages,
             contextToUse,
             lastUserMessage.content as string,
@@ -1865,7 +1922,10 @@
                                 return;
                             }
                             if (multiModelResponses[index]) {
-                                multiModelResponses[index].content = convertLatexToMarkdown(text);
+                                const convertedText = convertLatexToMarkdown(text);
+                                // 处理content中的base64图片，保存为assets文件
+                                const processedContent = await saveBase64ImagesInContent(convertedText);
+                                multiModelResponses[index].content = processedContent;
                                 multiModelResponses[index].thinking = thinking;
                                 multiModelResponses[index].isLoading = false;
                                 if (thinking && !multiModelResponses[index].thinkingCollapsed) {
@@ -1904,7 +1964,7 @@
     }
 
     // 准备发送给AI的消息（提取为独立函数以便复用）
-    function prepareMessagesForAI(
+    async function prepareMessagesForAI(
         messages: Message[],
         contextDocumentsWithLatestContent: ContextDocument[],
         userContent: string,
@@ -2040,32 +2100,71 @@
                         lastAssistantMsg.generatedImages &&
                         lastAssistantMsg.generatedImages.length > 0
                     ) {
-                        previousGeneratedImages = lastAssistantMsg.generatedImages.map(img => ({
-                            type: 'image_url',
-                            image_url: {
-                                url: `data:${img.mimeType || 'image/png'};base64,${img.data}`,
-                            },
-                        }));
+                        // 从路径加载图片并转换为 blob URL
+                        previousGeneratedImages = await Promise.all(
+                            lastAssistantMsg.generatedImages.map(async img => {
+                                let imageUrl = '';
+                                if (img.path) {
+                                    // 从路径加载图片
+                                    imageUrl = (await loadAsset(img.path)) || '';
+                                } else if (img.data) {
+                                    // 兼容旧数据（base64格式）
+                                    imageUrl = `data:${img.mimeType || 'image/png'};base64,${img.data}`;
+                                }
+                                return {
+                                    type: 'image_url',
+                                    image_url: { url: imageUrl },
+                                };
+                            })
+                        );
                     } else if (
                         lastAssistantMsg.attachments &&
                         lastAssistantMsg.attachments.length > 0
                     ) {
-                        previousGeneratedImages = lastAssistantMsg.attachments
-                            .filter(att => att.type === 'image')
-                            .map(att => ({
-                                type: 'image_url',
-                                image_url: { url: att.data },
-                            }));
+                        // 从附件中获取图片
+                        const imageAttachments = lastAssistantMsg.attachments.filter(
+                            att => att.type === 'image'
+                        );
+                        previousGeneratedImages = await Promise.all(
+                            imageAttachments.map(async att => {
+                                let imageUrl = att.data;
+                                // 如果附件有路径且当前data不可用，从路径重新加载
+                                if (att.path && (!imageUrl || !imageUrl.startsWith('blob:'))) {
+                                    imageUrl = (await loadAsset(att.path)) || att.data;
+                                }
+                                return {
+                                    type: 'image_url',
+                                    image_url: { url: imageUrl },
+                                };
+                            })
+                        );
                     } else if (typeof lastAssistantMsg.content === 'string') {
-                        // 从Markdown内容中提取图片URL ![image](url)
-                        const imageRegex = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g;
+                        // 从Markdown内容中提取图片 ![alt](url)
+                        const imageRegex = /!\[.*?\]\(([^)]+)\)/g;
                         const content = lastAssistantMsg.content;
                         let match;
                         while ((match = imageRegex.exec(content)) !== null) {
-                            previousGeneratedImages.push({
-                                type: 'image_url',
-                                image_url: { url: match[1] },
-                            });
+                            const url = match[1];
+                            // 处理 assets 路径的图片
+                            if (url.startsWith('/data/storage/petal/siyuan-plugin-copilot/assets/')) {
+                                try {
+                                    const blobUrl = await loadAsset(url);
+                                    if (blobUrl) {
+                                        previousGeneratedImages.push({
+                                            type: 'image_url',
+                                            image_url: { url: blobUrl },
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error('Failed to load asset image:', error);
+                                }
+                            } else if (url.startsWith('http://') || url.startsWith('https://')) {
+                                // HTTP/HTTPS URL 直接使用
+                                previousGeneratedImages.push({
+                                    type: 'image_url',
+                                    image_url: { url: url },
+                                });
+                            }
                         }
                     }
                 }
@@ -2717,15 +2816,32 @@
                                 image_url: { url: att.data },
                             }));
                     } else if (typeof lastAssistantMsg.content === 'string') {
-                        // 从Markdown内容中提取图片URL ![image](url)
-                        const imageRegex = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g;
+                        // 从Markdown内容中提取图片 ![alt](url)
+                        const imageRegex = /!\[.*?\]\(([^)]+)\)/g;
                         const content = lastAssistantMsg.content;
                         let match;
                         while ((match = imageRegex.exec(content)) !== null) {
-                            previousGeneratedImages.push({
-                                type: 'image_url' as const,
-                                image_url: { url: match[1] },
-                            });
+                            const url = match[1];
+                            // 处理 assets 路径的图片
+                            if (url.startsWith('/data/storage/petal/siyuan-plugin-copilot/assets/')) {
+                                try {
+                                    const blobUrl = await loadAsset(url);
+                                    if (blobUrl) {
+                                        previousGeneratedImages.push({
+                                            type: 'image_url' as const,
+                                            image_url: { url: blobUrl },
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error('Failed to load asset image:', error);
+                                }
+                            } else if (url.startsWith('http://') || url.startsWith('https://')) {
+                                // HTTP/HTTPS URL 直接使用
+                                previousGeneratedImages.push({
+                                    type: 'image_url' as const,
+                                    image_url: { url: url },
+                                });
+                            }
                         }
                     }
                 }
@@ -3299,14 +3415,17 @@
 
                                     const convertedText = convertLatexToMarkdown(fullText);
 
+                                    // 处理content中的base64图片，保存为assets文件
+                                    const processedContent = await saveBase64ImagesInContent(convertedText);
+
                                     // 如果之前有工具调用，将最终回复存储到 finalReply 字段
                                     if (
                                         firstToolCallMessageIndex !== null &&
-                                        convertedText.trim()
+                                        processedContent.trim()
                                     ) {
                                         const existingMessage = messages[firstToolCallMessageIndex];
                                         // 将AI的最终回复存储到 finalReply 字段
-                                        existingMessage.finalReply = convertedText;
+                                        existingMessage.finalReply = processedContent;
 
                                         if (isDeepseekThinkingAgent && streamingThinking) {
                                             existingMessage.reasoning_content = streamingThinking;
@@ -3381,6 +3500,12 @@
                 }
             } else {
                 // 非 Agent 模式或没有工具，使用原来的逻辑
+                
+                // 检查是否启用图片生成
+                const enableImageGeneration = modelConfig.capabilities?.imageGeneration || false;
+                // 用于保存生成的图片
+                let generatedImages: any[] = [];
+                
                 await chat(
                     currentProvider,
                     {
@@ -3396,6 +3521,28 @@
                         enableThinking,
                         reasoningEffort: modelConfig.thinkingEffort || 'low',
                         customBody, // 传递自定义参数
+                        enableImageGeneration,
+                        onImageGenerated: async (images: any[]) => {
+                            // 立即保存生成的图片到 SiYuan 资源文件夹并转换为 blob URL
+                            generatedImages = await Promise.all(
+                                images.map(async (img, idx) => {
+                                    const blob = base64ToBlob(
+                                        img.data,
+                                        img.mimeType || 'image/png'
+                                    );
+                                    const name = `generated-image-${Date.now()}-${idx + 1}.${
+                                        img.mimeType?.split('/')[1] || 'png'
+                                    }`;
+                                    const assetPath = await saveAsset(blob, name);
+                                    return {
+                                        ...img,
+                                        path: assetPath,
+                                        // 给前端显示用的 blob url
+                                        previewUrl: URL.createObjectURL(blob),
+                                    };
+                                })
+                            );
+                        },
                         onThinkingChunk: enableThinking
                             ? async (chunk: string) => {
                                   isThinkingPhase = true;
@@ -3425,9 +3572,12 @@
                             // 转换 LaTeX 数学公式格式为 Markdown 格式
                             const convertedText = convertLatexToMarkdown(fullText);
 
+                            // 处理content中的base64图片，保存为assets文件
+                            const processedContent = await saveBase64ImagesInContent(convertedText);
+
                             const assistantMessage: Message = {
                                 role: 'assistant',
-                                content: convertedText,
+                                content: processedContent,
                             };
 
                             // 如果有思考内容，添加到消息中
@@ -3484,6 +3634,27 @@
                                         messages = [...messages];
                                     }
                                 }
+                            }
+
+                            // 如果有生成的图片，保存到消息中
+                            if (generatedImages.length > 0) {
+                                // 保存图片信息（不包含base64数据，只保存路径）
+                                assistantMessage.generatedImages = generatedImages.map(img => ({
+                                    mimeType: img.mimeType,
+                                    data: '', // 不保存base64数据，节省空间
+                                    path: img.path,
+                                }));
+
+                                // 添加为附件以便显示（使用blob URL）
+                                assistantMessage.attachments = generatedImages.map((img, idx) => ({
+                                    type: 'image' as const,
+                                    name: `generated-image-${idx + 1}.${
+                                        img.mimeType?.split('/')[1] || 'png'
+                                    }`,
+                                    data: img.previewUrl, // 使用 blob URL 显示
+                                    path: img.path, // 保存路径用于持久化
+                                    mimeType: img.mimeType || 'image/png',
+                                }));
                             }
 
                             if (
@@ -3797,6 +3968,76 @@
         });
 
         return text;
+    }
+
+    // 将消息内容中的 base64 图片保存为 assets 文件并替换为路径
+    async function saveBase64ImagesInContent(content: string): Promise<string> {
+        // 匹配 Markdown 图片语法中的 base64 数据
+        const base64ImageRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g;
+        const matches = Array.from(content.matchAll(base64ImageRegex));
+        
+        if (matches.length === 0) {
+            return content;
+        }
+
+        let result = content;
+        for (const match of matches) {
+            const fullMatch = match[0];
+            const altText = match[1];
+            const dataUrl = match[2];
+            
+            try {
+                // 解析 data URL
+                const dataUrlMatch = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+                if (!dataUrlMatch) continue;
+                
+                const mimeType = dataUrlMatch[1];
+                const base64Data = dataUrlMatch[2];
+                
+                // 保存到 assets
+                const blob = base64ToBlob(base64Data, mimeType);
+                const ext = mimeType.split('/')[1] || 'png';
+                const assetPath = await saveAsset(blob, `image-${Date.now()}.${ext}`);
+                
+                // 替换为 assets 路径
+                result = result.replace(fullMatch, `![${altText}](${assetPath})`);
+                
+                console.log(`Saved generated image to assets: ${assetPath}`);
+            } catch (error) {
+                console.error('Failed to save base64 image:', error);
+            }
+        }
+        
+        return result;
+    }
+
+    // 将消息内容中的 assets 路径替换为 blob URL（用于显示）
+    async function replaceAssetPathsWithBlob(content: string): Promise<string> {
+        // 匹配 Markdown 图片语法中的 assets 路径
+        const assetImageRegex = /!\[([^\]]*)\]\((\/data\/storage\/petal\/siyuan-plugin-copilot\/assets\/[^)]+)\)/g;
+        const matches = Array.from(content.matchAll(assetImageRegex));
+        
+        if (matches.length === 0) {
+            return content;
+        }
+
+        let result = content;
+        for (const match of matches) {
+            const fullMatch = match[0];
+            const altText = match[1];
+            const assetPath = match[2];
+            
+            try {
+                const blobUrl = await loadAsset(assetPath);
+                if (blobUrl) {
+                    result = result.replace(fullMatch, `![${altText}](${blobUrl})`);
+                }
+            } catch (error) {
+                console.error('Failed to load asset for display:', error);
+            }
+        }
+        
+        return result;
     }
 
     function formatMessage(content: string | MessageContent[]): string {
@@ -5793,25 +6034,142 @@
                 const text = await blob.text();
                 const sessionData = JSON.parse(text);
                 const loadedMessages = sessionData?.messages || [];
+                let sessionModified = false; // 标记会话是否被修改（需要重新保存）
 
                 // 还原图片数据 (从 path 还原为 blob url) 和文本附件数据
+                // 同时处理旧的 base64 格式图片，自动保存到 assets
                 for (const msg of loadedMessages) {
-                    if (msg.attachments) {
-                        for (const att of msg.attachments) {
-                            if (att.path) {
-                                if (att.type === 'image') {
-                                    att.data = (await loadAsset(att.path)) || '';
-                                } else {
-                                    // 还原文本附件内容
-                                    att.data = (await readAssetAsText(att.path)) || '';
+                    // 处理 content 中的 Markdown 格式 base64 图片
+                    if (typeof msg.content === 'string' && msg.content.includes('data:image')) {
+                        const base64ImageRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g;
+                        let match;
+                        const imagesToProcess: Array<{ fullMatch: string; altText: string; dataUrl: string }> = [];
+                        
+                        // 收集所有需要处理的图片
+                        while ((match = base64ImageRegex.exec(msg.content)) !== null) {
+                            imagesToProcess.push({
+                                fullMatch: match[0],
+                                altText: match[1] || 'image',
+                                dataUrl: match[2]
+                            });
+                        }
+                        
+                        // 处理每个图片
+                        if (imagesToProcess.length > 0) {
+                            let newContent = msg.content;
+                            
+                            for (const imageInfo of imagesToProcess) {
+                                try {
+                                    // 解析 data URL
+                                    const matches = imageInfo.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+                                    if (!matches) continue;
+                                    
+                                    const mimeType = matches[1];
+                                    const base64Data = matches[2];
+                                    
+                                    // 保存到 assets
+                                    const blob = base64ToBlob(base64Data, mimeType);
+                                    const ext = mimeType.split('/')[1] || 'png';
+                                    const assetPath = await saveAsset(blob, `image-${Date.now()}.${ext}`);
+                                    
+                                    // 替换为 assets 路径，保持 Markdown 格式
+                                    newContent = newContent.replace(
+                                        imageInfo.fullMatch,
+                                        `![${imageInfo.altText}](${assetPath})`
+                                    );
+                                    
+                                    sessionModified = true;
+                                    console.log(`Migrated content base64 image to assets: ${assetPath}`);
+                                } catch (error) {
+                                    console.error('Failed to migrate content base64 image:', error);
                                 }
+                            }
+                            
+                            // 更新消息内容
+                            if (sessionModified) {
+                                msg.content = newContent;
                             }
                         }
                     }
+                    
+                    if (msg.attachments) {
+                        for (const att of msg.attachments) {
+                            if (att.type === 'image') {
+                                if (att.path) {
+                                    // 从路径加载图片
+                                    att.data = (await loadAsset(att.path)) || '';
+                                } else if (att.data && (att.data.startsWith('data:image') || att.data.length > 1000)) {
+                                    // 旧格式：有 base64 数据但没有 path，自动迁移到 assets
+                                    try {
+                                        let base64Data = att.data;
+                                        let mimeType = att.mimeType || 'image/png';
+                                        
+                                        // 如果是 data URL，提取 mime type 和数据
+                                        if (base64Data.startsWith('data:')) {
+                                            const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+                                            if (matches) {
+                                                mimeType = matches[1];
+                                                base64Data = matches[2];
+                                            }
+                                        }
+                                        
+                                        const blob = base64ToBlob(base64Data, mimeType);
+                                        const ext = mimeType.split('/')[1] || 'png';
+                                        const name = att.name || `image-${Date.now()}.${ext}`;
+                                        const assetPath = await saveAsset(blob, name);
+                                        
+                                        // 更新附件信息
+                                        att.path = assetPath;
+                                        att.data = URL.createObjectURL(blob); // 设置为 blob URL
+                                        att.mimeType = mimeType;
+                                        
+                                        sessionModified = true;
+                                        console.log(`Migrated attachment base64 image to assets: ${assetPath}`);
+                                    } catch (error) {
+                                        console.error('Failed to migrate attachment base64 image:', error);
+                                    }
+                                }
+                            } else if (att.path) {
+                                // 还原文本附件内容
+                                att.data = (await readAssetAsText(att.path)) || '';
+                            }
+                        }
+                    }
+                    
                     if (msg.generatedImages) {
                         for (const img of msg.generatedImages) {
                             if (img.path) {
+                                // 从路径加载图片
                                 img.previewUrl = (await loadAsset(img.path)) || '';
+                            } else if (img.data && img.data.length > 0) {
+                                // 旧格式：有 base64 数据但没有 path，自动迁移到 assets
+                                try {
+                                    const blob = base64ToBlob(img.data, img.mimeType || 'image/png');
+                                    const ext = (img.mimeType || 'image/png').split('/')[1] || 'png';
+                                    const name = `generated-image-${Date.now()}.${ext}`;
+                                    const assetPath = await saveAsset(blob, name);
+                                    
+                                    // 更新图片信息
+                                    img.path = assetPath;
+                                    img.data = ''; // 清空 base64 数据
+                                    img.previewUrl = URL.createObjectURL(blob);
+                                    
+                                    // 同时更新 attachments（如果存在）
+                                    if (msg.attachments) {
+                                        const attIndex = msg.attachments.findIndex(
+                                            a => a.type === 'image' && !a.path
+                                        );
+                                        if (attIndex !== -1) {
+                                            msg.attachments[attIndex].path = assetPath;
+                                            msg.attachments[attIndex].data = URL.createObjectURL(blob);
+                                        }
+                                    }
+                                    
+                                    sessionModified = true;
+                                    console.log(`Migrated generated image to assets: ${assetPath}`);
+                                } catch (error) {
+                                    console.error('Failed to migrate generated image:', error);
+                                }
                             }
                         }
                     }
@@ -5831,6 +6189,12 @@
                 }
                 currentSessionId = sessionId;
                 hasUnsavedChanges = false;
+
+                // 如果会话被修改（迁移了 base64 图片），自动保存
+                if (sessionModified) {
+                    console.log('Session was modified during load, saving...');
+                    await saveCurrentSession(true); // 静默保存
+                }
 
                 // 清除多模型状态
                 multiModelResponses = [];
@@ -7270,32 +7634,71 @@
                         lastAssistantMsg.generatedImages &&
                         lastAssistantMsg.generatedImages.length > 0
                     ) {
-                        previousGeneratedImages = lastAssistantMsg.generatedImages.map(img => ({
-                            type: 'image_url' as const,
-                            image_url: {
-                                url: `data:${img.mimeType || 'image/png'};base64,${img.data}`,
-                            },
-                        }));
+                        // 从路径加载图片并转换为 blob URL
+                        previousGeneratedImages = await Promise.all(
+                            lastAssistantMsg.generatedImages.map(async img => {
+                                let imageUrl = '';
+                                if (img.path) {
+                                    // 从路径加载图片
+                                    imageUrl = (await loadAsset(img.path)) || '';
+                                } else if (img.data) {
+                                    // 兼容旧数据（base64格式）
+                                    imageUrl = `data:${img.mimeType || 'image/png'};base64,${img.data}`;
+                                }
+                                return {
+                                    type: 'image_url' as const,
+                                    image_url: { url: imageUrl },
+                                };
+                            })
+                        );
                     } else if (
                         lastAssistantMsg.attachments &&
                         lastAssistantMsg.attachments.length > 0
                     ) {
-                        previousGeneratedImages = lastAssistantMsg.attachments
-                            .filter(att => att.type === 'image')
-                            .map(att => ({
-                                type: 'image_url' as const,
-                                image_url: { url: att.data },
-                            }));
+                        // 从附件中获取图片
+                        const imageAttachments = lastAssistantMsg.attachments.filter(
+                            att => att.type === 'image'
+                        );
+                        previousGeneratedImages = await Promise.all(
+                            imageAttachments.map(async att => {
+                                let imageUrl = att.data;
+                                // 如果附件有路径且当前data不可用，从路径重新加载
+                                if (att.path && (!imageUrl || !imageUrl.startsWith('blob:'))) {
+                                    imageUrl = (await loadAsset(att.path)) || att.data;
+                                }
+                                return {
+                                    type: 'image_url' as const,
+                                    image_url: { url: imageUrl },
+                                };
+                            })
+                        );
                     } else if (typeof lastAssistantMsg.content === 'string') {
-                        // 从Markdown内容中提取图片URL ![image](url)
-                        const imageRegex = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g;
+                        // 从Markdown内容中提取图片 ![alt](url)
+                        const imageRegex = /!\[.*?\]\(([^)]+)\)/g;
                         const content = lastAssistantMsg.content;
                         let match;
                         while ((match = imageRegex.exec(content)) !== null) {
-                            previousGeneratedImages.push({
-                                type: 'image_url' as const,
-                                image_url: { url: match[1] },
-                            });
+                            const url = match[1];
+                            // 处理 assets 路径的图片
+                            if (url.startsWith('/data/storage/petal/siyuan-plugin-copilot/assets/')) {
+                                try {
+                                    const blobUrl = await loadAsset(url);
+                                    if (blobUrl) {
+                                        previousGeneratedImages.push({
+                                            type: 'image_url' as const,
+                                            image_url: { url: blobUrl },
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error('Failed to load asset image:', error);
+                                }
+                            } else if (url.startsWith('http://') || url.startsWith('https://')) {
+                                // HTTP/HTTPS URL 直接使用
+                                previousGeneratedImages.push({
+                                    type: 'image_url' as const,
+                                    image_url: { url: url },
+                                });
+                            }
                         }
                     }
                 }
@@ -7471,8 +7874,26 @@
                               thinkingCollapsed[messages.length] = true;
                           }
                         : undefined,
-                    onImageGenerated: (images: any[]) => {
-                        generatedImages = images;
+                    onImageGenerated: async (images: any[]) => {
+                        // 立即保存生成的图片到 SiYuan 资源文件夹并转换为 blob URL
+                        generatedImages = await Promise.all(
+                            images.map(async (img, idx) => {
+                                const blob = base64ToBlob(
+                                    img.data,
+                                    img.mimeType || 'image/png'
+                                );
+                                const name = `generated-image-${Date.now()}-${idx + 1}.${
+                                    img.mimeType?.split('/')[1] || 'png'
+                                }`;
+                                const assetPath = await saveAsset(blob, name);
+                                return {
+                                    ...img,
+                                    path: assetPath,
+                                    // 给前端显示用的 blob url
+                                    previewUrl: URL.createObjectURL(blob),
+                                };
+                            })
+                        );
                     },
                     onChunk: async (chunk: string) => {
                         streamingMessage += chunk;
@@ -7487,9 +7908,12 @@
                         // 转换 LaTeX 数学公式格式为 Markdown 格式
                         const convertedText = convertLatexToMarkdown(fullText);
 
+                        // 处理content中的base64图片，保存为assets文件
+                        const processedContent = await saveBase64ImagesInContent(convertedText);
+
                         const assistantMessage: Message = {
                             role: 'assistant',
-                            content: convertedText,
+                            content: processedContent,
                         };
 
                         if (enableThinking && streamingThinking) {
@@ -7498,40 +7922,21 @@
 
                         // 如果有生成的图片，保存到消息中
                         if (generatedImages.length > 0) {
-                            // 先异步保存所有图片到 SiYuan 资源文件夹
-                            const processedImages = await Promise.all(
-                                generatedImages.map(async (img, idx) => {
-                                    const blob = base64ToBlob(
-                                        img.data,
-                                        img.mimeType || 'image/png'
-                                    );
-                                    const name = `generated-image-${idx + 1}.${
-                                        img.mimeType?.split('/')[1] || 'png'
-                                    }`;
-                                    const assetPath = await saveAsset(blob, name);
-                                    return {
-                                        ...img,
-                                        path: assetPath,
-                                        // 给前端显示用的 blob url
-                                        previewUrl: URL.createObjectURL(blob),
-                                    };
-                                })
-                            );
-
-                            assistantMessage.generatedImages = processedImages.map(img => ({
+                            // 保存图片信息（不包含base64数据，只保存路径）
+                            assistantMessage.generatedImages = generatedImages.map(img => ({
                                 mimeType: img.mimeType,
-                                data: '', // 不再这里存数据
+                                data: '', // 不保存base64数据，节省空间
                                 path: img.path,
                             }));
 
-                            // 同时添加为附件以便显示
-                            assistantMessage.attachments = processedImages.map((img, idx) => ({
+                            // 添加为附件以便显示（使用blob URL）
+                            assistantMessage.attachments = generatedImages.map((img, idx) => ({
                                 type: 'image' as const,
                                 name: `generated-image-${idx + 1}.${
                                     img.mimeType?.split('/')[1] || 'png'
                                 }`,
-                                data: img.previewUrl,
-                                path: img.path,
+                                data: img.previewUrl, // 使用 blob URL 显示
+                                path: img.path, // 保存路径用于持久化
                                 mimeType: img.mimeType || 'image/png',
                             }));
                         }
@@ -7785,8 +8190,9 @@
                                     <span class="ai-message__thinking-title">💭 思考过程</span>
                                 </div>
                                 {#if !thinkingCollapsed[thinkingIndex]}
+                                    {@const thinkDisplay = getDisplayContent(message.thinking)}
                                     <div class="ai-message__thinking-content b3-typography">
-                                        {@html formatMessage(message.thinking)}
+                                        {@html thinkDisplay}
                                     </div>
                                 {/if}
                             </div>
@@ -7796,11 +8202,12 @@
                         {#if message.content && message.content
                                 .toString()
                                 .trim() && !(message.role === 'assistant' && message.multiModelResponses && message.multiModelResponses.length > 0)}
+                            {@const displayContent = getDisplayContent(message.content)}
                             <div
                                 class="ai-message__content b3-typography"
                                 style={messageFontSize ? `font-size: ${messageFontSize}px;` : ''}
                             >
-                                {@html formatMessage(message.content)}
+                                {@html displayContent}
                             </div>
                         {/if}
 
@@ -7938,12 +8345,11 @@
                                                                 </span>
                                                             </div>
                                                             {#if !isCollapsed}
+                                                                {@const thinkingDisplay = getDisplayContent(response.thinking)}
                                                                 <div
                                                                     class="ai-message__thinking-content b3-typography"
                                                                 >
-                                                                    {@html formatMessage(
-                                                                        response.thinking
-                                                                    )}
+                                                                    {@html thinkingDisplay}
                                                                 </div>
                                                             {/if}
                                                         </div>
@@ -7968,7 +8374,8 @@
                                                                 {response.error}
                                                             </div>
                                                         {:else if response.content}
-                                                            {@html formatMessage(response.content)}
+                                                            {@const contentDisplay = getDisplayContent(response.content)}
+                                                            {@html contentDisplay}
                                                         {/if}
                                                     </div>
                                                 </div>
@@ -8172,11 +8579,12 @@
 
                         <!-- 显示工具调用后的最终回复 -->
                         {#if message.role === 'assistant' && message.finalReply}
+                            {@const finalReplyDisplay = getDisplayContent(message.finalReply)}
                             <div
                                 class="ai-message__content ai-message__final-reply b3-typography"
                                 style={messageFontSize ? `font-size: ${messageFontSize}px;` : ''}
                             >
-                                {@html formatMessage(message.finalReply)}
+                                {@html finalReplyDisplay}
                             </div>
                         {/if}
 
@@ -8339,25 +8747,28 @@
                             </span>
                         </div>
                         {#if !isThinkingPhase}
+                            {@const streamThinkingDisplay = getDisplayContent(streamingThinking)}
                             <div class="ai-message__thinking-content b3-typography">
-                                {@html formatMessage(streamingThinking)}
+                                {@html streamThinkingDisplay}
                             </div>
                         {:else}
+                            {@const streamThinkingDisplay2 = getDisplayContent(streamingThinking)}
                             <div
                                 class="ai-message__thinking-content ai-message__thinking-content--streaming b3-typography"
                             >
-                                {@html formatMessage(streamingThinking)}
+                                {@html streamThinkingDisplay2}
                             </div>
                         {/if}
                     </div>
                 {/if}
 
                 {#if streamingMessage}
+                    {@const streamMsgDisplay = getDisplayContent(streamingMessage)}
                     <div
                         class="ai-message__content b3-typography"
                         style={messageFontSize ? `font-size: ${messageFontSize}px;` : ''}
                     >
-                        {@html formatMessage(streamingMessage)}
+                        {@html streamMsgDisplay}
                     </div>
                 {:else if !streamingThinking}
                     <div class="ai-message__content b3-typography">
@@ -8500,8 +8911,9 @@
                                             </span>
                                         </div>
                                         {#if !response.thinkingCollapsed}
+                                            {@const streamCardThink = getDisplayContent(response.thinking)}
                                             <div class="ai-message__thinking-content b3-typography">
-                                                {@html formatMessage(response.thinking)}
+                                                {@html streamCardThink}
                                             </div>
                                         {/if}
                                     </div>
@@ -8520,7 +8932,8 @@
                                             {response.error}
                                         </div>
                                     {:else if response.content}
-                                        {@html formatMessage(response.content)}
+                                        {@const streamCardContent = getDisplayContent(response.content)}
+                                        {@html streamCardContent}
                                     {:else if response.isLoading}
                                         <div class="ai-sidebar__multi-model-card-loading">
                                             <span class="jumping-dots">
@@ -8671,10 +9084,11 @@
                                                 </span>
                                             </div>
                                             {#if !response.thinkingCollapsed}
+                                                {@const streamTabThink = getDisplayContent(response.thinking)}
                                                 <div
                                                     class="ai-message__thinking-content b3-typography"
                                                 >
-                                                    {@html formatMessage(response.thinking)}
+                                                    {@html streamTabThink}
                                                 </div>
                                             {/if}
                                         </div>
@@ -8698,7 +9112,8 @@
                                                 {response.error}
                                             </div>
                                         {:else if response.content}
-                                            {@html formatMessage(response.content)}
+                                            {@const streamTabContent = getDisplayContent(response.content)}
+                                            {@html streamTabContent}
                                         {:else if response.isLoading}
                                             <div class="ai-sidebar__multi-model-tab-panel-loading">
                                                 {t('multiModel.loading')}

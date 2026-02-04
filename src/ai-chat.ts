@@ -857,6 +857,7 @@ async function handleStreamResponse(
     let isThinkingPhase = false;
     let toolCalls: ToolCall[] = [];
     let toolCallBuffer: Record<number, { id?: string; name?: string; arguments?: string }> = {};
+    const generatedImages: GeneratedImageData[] = [];
 
     try {
         while (true) {
@@ -879,6 +880,25 @@ async function handleStreamResponse(
                     try {
                         const json = JSON.parse(payload);
                         const delta = json.choices?.[0]?.delta;
+
+                        // 检查是否有图片数据 (某些 API 可能在流式响应中返回图片)
+                        // 支持多种可能的图片数据格式
+                        if (delta?.images || delta?.image || json.images || json.image) {
+                            const imageData = delta?.images || delta?.image || json.images || json.image;
+                            const imageArray = Array.isArray(imageData) ? imageData : [imageData];
+                            
+                            for (const img of imageArray) {
+                                if (img.b64_json || img.data) {
+                                    generatedImages.push({
+                                        mimeType: img.mime_type || img.mimeType || 'image/png',
+                                        data: img.b64_json || img.data
+                                    });
+                                } else if (img.url) {
+                                    // 如果只有 URL，需要下载图片并转换为 base64
+                                    // 这里暂时跳过，因为需要异步处理
+                                }
+                            }
+                        }
 
                         // 检查是否有思考内容
                         // DeepSeek 使用 reasoning_content
@@ -954,6 +974,11 @@ async function handleStreamResponse(
             if (toolCalls.length > 0 && options.onToolCallComplete) {
                 options.onToolCallComplete(toolCalls);
             }
+        }
+
+        // 如果有生成的图片，调用回调
+        if (generatedImages.length > 0 && options.onImageGenerated) {
+            options.onImageGenerated(generatedImages);
         }
 
         options.onComplete?.(fullText);

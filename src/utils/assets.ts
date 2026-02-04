@@ -95,7 +95,13 @@ export async function readAssetAsText(path: string): Promise<string | null> {
  * 将 Base64 转换为 Blob
  */
 export function base64ToBlob(base64: string, mimeType: string): Blob {
-    const byteString = atob(base64.split(',')[1]);
+    // 如果包含 data: 前缀，提取实际的 base64 数据
+    let base64Data = base64;
+    if (base64.includes(',')) {
+        base64Data = base64.split(',')[1];
+    }
+    
+    const byteString = atob(base64Data);
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
     for (let i = 0; i < byteString.length; i++) {
