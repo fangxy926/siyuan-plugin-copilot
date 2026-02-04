@@ -304,7 +304,9 @@
                     value: settings.autoRenameSession,
                     type: 'checkbox',
                     title: t('settings.autoRenameSession.title') || '会话自动重命名',
-                    description: t('settings.autoRenameSession.description') || '在首次发送消息时，自动使用AI生成会话标题',
+                    description:
+                        t('settings.autoRenameSession.description') ||
+                        '在首次发送消息时，自动使用AI生成会话标题',
                 },
             ],
         },
@@ -365,7 +367,7 @@
                     `,
                 },
             ],
-        }
+        },
     ];
 
     let focusGroup = groups[0].name;
@@ -652,7 +654,7 @@
                     display={true}
                     on:changed={onChanged}
                 />
-                
+
                 {#if settings.autoRenameSession}
                     <div class="auto-rename-model-selector">
                         <div class="config__item">
@@ -661,10 +663,14 @@
                                     {t('settings.autoRenameSession.modelTitle') || '重命名模型'}
                                 </div>
                                 <div class="config__item-description">
-                                    {t('settings.autoRenameSession.modelDescription') || '选择用于生成会话标题的AI模型'}
+                                    {t('settings.autoRenameSession.modelDescription') ||
+                                        '选择用于生成会话标题的AI模型'}
                                 </div>
                             </div>
-                            <div class="config__item-control" style="display: flex; gap: 8px; align-items: center;">
+                            <div
+                                class="config__item-control"
+                                style="display: flex; gap: 8px; align-items: center;"
+                            >
                                 <select
                                     class="b3-select"
                                     bind:value={settings.autoRenameProvider}
@@ -673,35 +679,45 @@
                                         saveSettings();
                                     }}
                                 >
-                                    <option value="">{t('settings.autoRenameSession.selectProvider') || '-- 选择平台 --'}</option>
+                                    <option value="">
+                                        {t('settings.autoRenameSession.selectProvider') ||
+                                            '-- 选择平台 --'}
+                                    </option>
                                     {#each allProviderOptions as provider}
                                         {#if settings.aiProviders[provider.id]?.models?.length > 0 || (provider.type === 'custom' && settings.aiProviders.customProviders.find(p => p.id === provider.id)?.models?.length > 0)}
                                             <option value={provider.id}>{provider.name}</option>
                                         {/if}
                                     {/each}
                                 </select>
-                                
+
                                 {#if settings.autoRenameProvider}
                                     <select
                                         class="b3-select"
                                         bind:value={settings.autoRenameModelId}
                                         on:change={saveSettings}
                                     >
-                                        <option value="">{t('settings.autoRenameSession.selectModel') || '-- 选择模型 --'}</option>
+                                        <option value="">
+                                            {t('settings.autoRenameSession.selectModel') ||
+                                                '-- 选择模型 --'}
+                                        </option>
                                         {#if builtInProviderNames[settings.autoRenameProvider]}
                                             {#each settings.aiProviders[settings.autoRenameProvider]?.models || [] as model}
-                                                <option value={model.id}>{model.name || model.id}</option>
+                                                <option value={model.id}>
+                                                    {model.name || model.id}
+                                                </option>
                                             {/each}
                                         {:else}
                                             {#each settings.aiProviders.customProviders.find(p => p.id === settings.autoRenameProvider)?.models || [] as model}
-                                                <option value={model.id}>{model.name || model.id}</option>
+                                                <option value={model.id}>
+                                                    {model.name || model.id}
+                                                </option>
                                             {/each}
                                         {/if}
                                     </select>
                                 {/if}
                             </div>
                         </div>
-                        
+
                         <!-- 自定义提示词 -->
                         <div class="config__item" style="margin-top: 16px;">
                             <div class="config__item-label">
@@ -709,7 +725,8 @@
                                     {t('settings.autoRenameSession.promptTitle') || '自定义提示词'}
                                 </div>
                                 <div class="config__item-description">
-                                    {t('settings.autoRenameSession.promptDescription') || '自定义生成会话标题的提示词，使用 {message} 作为用户消息的占位符'}
+                                    {t('settings.autoRenameSession.promptDescription') ||
+                                        '自定义生成会话标题的提示词，使用 {message} 作为用户消息的占位符'}
                                 </div>
                             </div>
                             <div class="config__item-control">
@@ -718,7 +735,10 @@
                                     rows="4"
                                     bind:value={settings.autoRenamePrompt}
                                     on:change={saveSettings}
-                                    placeholder={t('settings.autoRenameSession.promptPlaceholder') || '请根据以下用户消息生成一个简洁的会话标题（不超过20个字，不要使用引号）：\n\n{message}'}
+                                    placeholder={t(
+                                        'settings.autoRenameSession.promptPlaceholder'
+                                    ) ||
+                                        '请根据以下用户消息生成一个简洁的会话标题（不超过20个字，不要使用引号）：\n\n{message}'}
                                 ></textarea>
                             </div>
                         </div>
@@ -926,12 +946,12 @@
         display: flex;
         gap: 8px;
         align-items: center;
-        
+
         .b3-select {
             flex: 1;
             min-width: 0;
         }
-        
+
         textarea.b3-text-field {
             width: 100%;
             min-height: 80px;
@@ -940,7 +960,7 @@
             line-height: 1.6;
             font-family: var(--b3-font-family);
             resize: vertical;
-            
+
             &::placeholder {
                 color: var(--b3-theme-on-surface-light);
                 opacity: 0.6;
