@@ -13,7 +13,7 @@
     export let isCustomProvider: boolean = false; // 是否为自定义平台
 
     // 内置平台列表（不需要自定义参数）
-    const builtInProviders = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'Achuan'];
+    const builtInProviders = ['Achuan','gemini', 'deepseek', 'openai', 'moonshot', 'volcano'];
     $: isBuiltInProvider = builtInProviders.includes(providerId);
 
     const dispatch = createEventDispatcher();

@@ -40,6 +40,11 @@ export const getDefaultSettings = () => ({
 
     // AI 设置 - 新的多平台多模型结构
     aiProviders: {
+        Achuan: {
+            apiKey: '',
+            customApiUrl: '',
+            models: []
+        },
         gemini: {
             apiKey: '',
             customApiUrl: '',
@@ -61,11 +66,6 @@ export const getDefaultSettings = () => ({
             models: []
         },
         volcano: {
-            apiKey: '',
-            customApiUrl: '',
-            models: []
-        },
-        Achuan: {
             apiKey: '',
             customApiUrl: '',
             models: []
