@@ -2377,9 +2377,6 @@
 
         // 自动保存会话
         saveCurrentSession(true);
-
-        // 根据选择的AI回答自动重命名会话标题
-        autoRenameSession(selectedResponse.content);
     }
 
     // 自动重命名会话
