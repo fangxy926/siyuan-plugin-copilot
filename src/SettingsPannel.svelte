@@ -22,7 +22,7 @@
     }
 
     const builtInProviderNames: Record<string, string> = {
-        aapi: t('platform.builtIn.aapi'),
+        Achuan: t('platform.builtIn.Achuan'),
         gemini: t('platform.builtIn.gemini'),
         openai: t('platform.builtIn.openai'),
         deepseek: t('platform.builtIn.deepseek'),
@@ -37,7 +37,7 @@
         moonshot: 'https://api.moonshot.cn',
         openai: 'https://api.openai.com',
         volcano: 'https://ark.cn-beijing.volces.com',
-        aapi: 'https://gpt.achuan-2.top/',
+        Achuan: 'https://gpt.achuan-2.top/',
     };
 
     // 内置平台的官网链接
@@ -47,7 +47,7 @@
         moonshot: 'https://platform.moonshot.cn/',
         openai: 'https://platform.openai.com/',
         volcano: 'https://console.volcengine.com/ark',
-        aapi: 'https://gpt.achuan-2.top/register?aff=ZndO',
+        Achuan: 'https://gpt.achuan-2.top/register?aff=ZndO',
     };
 
     // 当前选中的平台ID
@@ -407,13 +407,20 @@
                 openai: { apiKey: '', customApiUrl: '', models: [] },
                 moonshot: { apiKey: '', customApiUrl: '', models: [] },
                 volcano: { apiKey: '', customApiUrl: '', models: [] },
-                aapi: { apiKey: '', customApiUrl: '', models: [] },
+                Achuan: { apiKey: '', customApiUrl: '', models: [] },
                 customProviders: [],
             };
         }
 
         // 确保每个内置平台都存在（支持旧配置升级）
-        const builtInPlatformIds = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'aapi'];
+        const builtInPlatformIds = [
+            'gemini',
+            'deepseek',
+            'openai',
+            'moonshot',
+            'volcano',
+            'Achuan',
+        ];
         for (const platformId of builtInPlatformIds) {
             if (!settings.aiProviders[platformId]) {
                 settings.aiProviders[platformId] = { apiKey: '', customApiUrl: '', models: [] };

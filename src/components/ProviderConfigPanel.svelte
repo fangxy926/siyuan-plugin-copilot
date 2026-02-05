@@ -13,7 +13,7 @@
     export let isCustomProvider: boolean = false; // 是否为自定义平台
 
     // 内置平台列表（不需要自定义参数）
-    const builtInProviders = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'aapi'];
+    const builtInProviders = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'Achuan'];
     $: isBuiltInProvider = builtInProviders.includes(providerId);
 
     const dispatch = createEventDispatcher();
@@ -348,9 +348,9 @@
                         </a>
                     {/if}
                 </div>
-                {#if providerId === 'aapi'}
+                {#if providerId === 'Achuan'}
                     <div class="provider-description">
-                        {t('platform.builtIn.aapiDescription')}
+                        {t('platform.builtIn.AchuanDescription')}
                     </div>
                 {/if}
             </div>

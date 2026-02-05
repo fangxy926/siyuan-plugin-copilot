@@ -65,7 +65,7 @@ export const getDefaultSettings = () => ({
             customApiUrl: '',
             models: []
         },
-        aapi: {
+        Achuan: {
             apiKey: '',
             customApiUrl: '',
             models: []
