@@ -15,7 +15,12 @@
         temperatureEnabled: true,
         systemPrompt: '',
         modelSelectionEnabled: false,
-        selectedModels: [] as Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>,
+        selectedModels: [] as Array<{
+            provider: string;
+            modelId: string;
+            thinkingEnabled?: boolean;
+            thinkingEffort?: ThinkingEffort;
+        }>,
         enableMultiModel: false,
         chatMode: 'ask' as 'ask' | 'edit' | 'agent',
     };
@@ -42,7 +47,12 @@
     let tempTemperatureEnabled = false;
     let tempSystemPrompt = '';
     let tempModelSelectionEnabled = false;
-    let tempSelectedModels: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }> = [];
+    let tempSelectedModels: Array<{
+        provider: string;
+        modelId: string;
+        thinkingEnabled?: boolean;
+        thinkingEffort?: ThinkingEffort;
+    }> = [];
     let tempEnableMultiModel = false;
     let tempChatMode: 'ask' | 'edit' | 'agent' = 'ask';
 
@@ -58,7 +68,13 @@
         temperatureEnabled: boolean;
         systemPrompt: string;
         modelSelectionEnabled: boolean;
-        selectedModels: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>;        enableMultiModel: boolean;
+        selectedModels: Array<{
+            provider: string;
+            modelId: string;
+            thinkingEnabled?: boolean;
+            thinkingEffort?: ThinkingEffort;
+        }>;
+        enableMultiModel: boolean;
         chatMode: 'ask' | 'edit' | 'agent';
         createdAt: number;
     }
@@ -86,7 +102,12 @@
         temperatureEnabled: true,
         systemPrompt: '',
         modelSelectionEnabled: false,
-        selectedModels: [] as Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>,
+        selectedModels: [] as Array<{
+            provider: string;
+            modelId: string;
+            thinkingEnabled?: boolean;
+            thinkingEffort?: ThinkingEffort;
+        }>,
         enableMultiModel: false,
         chatMode: 'ask' as 'ask' | 'edit' | 'agent',
     };
@@ -100,7 +121,16 @@
     }
 
     // 处理MultiModelSelector的变化事件（多模型模式）
-    function handleModelsChange(event: CustomEvent<Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>>) {
+    function handleModelsChange(
+        event: CustomEvent<
+            Array<{
+                provider: string;
+                modelId: string;
+                thinkingEnabled?: boolean;
+                thinkingEffort?: ThinkingEffort;
+            }>
+        >
+    ) {
         tempSelectedModels = event.detail;
         applySettings();
     }
@@ -187,7 +217,12 @@
 
     // 格式化预设的模型列表显示
     function formatPresetModels(
-        selectedModels: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>
+        selectedModels: Array<{
+            provider: string;
+            modelId: string;
+            thinkingEnabled?: boolean;
+            thinkingEffort?: ThinkingEffort;
+        }>
     ): string {
         const modelCounts: Record<string, number> = {};
         selectedModels.forEach(m => {
@@ -440,13 +475,28 @@
 
     // 比较两个模型数组是否相等
     function areModelsEqual(
-        models1: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>,
-        models2: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>
+        models1: Array<{
+            provider: string;
+            modelId: string;
+            thinkingEnabled?: boolean;
+            thinkingEffort?: ThinkingEffort;
+        }>,
+        models2: Array<{
+            provider: string;
+            modelId: string;
+            thinkingEnabled?: boolean;
+            thinkingEffort?: ThinkingEffort;
+        }>
     ): boolean {
         if (models1.length !== models2.length) return false;
         return models1.every((m1, index) => {
             const m2 = models2[index];
-            return m1.provider === m2.provider && m1.modelId === m2.modelId && m1.thinkingEnabled === m2.thinkingEnabled && m1.thinkingEffort === m2.thinkingEffort;
+            return (
+                m1.provider === m2.provider &&
+                m1.modelId === m2.modelId &&
+                m1.thinkingEnabled === m2.thinkingEnabled &&
+                m1.thinkingEffort === m2.thinkingEffort
+            );
         });
     }
 

@@ -6,7 +6,12 @@
     import { t } from '../utils/i18n';
 
     export let providers: Record<string, any>;
-    export let selectedModels: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }> = [];
+    export let selectedModels: Array<{
+        provider: string;
+        modelId: string;
+        thinkingEnabled?: boolean;
+        thinkingEffort?: ThinkingEffort;
+    }> = [];
     export let isOpen = false;
     export let enableMultiModel = false; // 是否启用多模型模式
     export let currentProvider = ''; // 单选模式当前选中的提供商
@@ -144,7 +149,15 @@
             // 从 provider 配置中读取默认的 thinkingEnabled 和 thinkingEffort 值
             const defaultThinkingEnabled = getProviderModelThinkingEnabled(provider, modelId);
             const defaultThinkingEffort = getProviderModelThinkingEffort(provider, modelId);
-            selectedModels = [...selectedModels, { provider, modelId, thinkingEnabled: defaultThinkingEnabled, thinkingEffort: defaultThinkingEffort }];
+            selectedModels = [
+                ...selectedModels,
+                {
+                    provider,
+                    modelId,
+                    thinkingEnabled: defaultThinkingEnabled,
+                    thinkingEffort: defaultThinkingEffort,
+                },
+            ];
             dispatch('change', selectedModels);
         } else {
             // 单选模式：选择模型后关闭下拉框
@@ -715,7 +728,8 @@
                                                     type="checkbox"
                                                     class="b3-switch"
                                                     checked={model.thinkingEnabled || false}
-                                                    on:change={() => toggleModelInstanceThinking(index)}
+                                                    on:change={() =>
+                                                        toggleModelInstanceThinking(index)}
                                                 />
                                                 <span class="multi-model-selector__thinking-label">
                                                     思考
@@ -725,7 +739,8 @@
                                                 <select
                                                     class="b3-select multi-model-selector__thinking-effort"
                                                     value={model.thinkingEffort || 'low'}
-                                                    on:change={(e) => handleThinkingEffortChange(index, e)}
+                                                    on:change={e =>
+                                                        handleThinkingEffortChange(index, e)}
                                                     on:click|stopPropagation
                                                     title="思考程度"
                                                 >
