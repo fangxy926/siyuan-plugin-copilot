@@ -156,7 +156,7 @@
         temperatureEnabled: true,
         systemPrompt: '',
         modelSelectionEnabled: false,
-        selectedModels: [] as Array<{ provider: string; modelId: string }>,
+        selectedModels: [] as Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>,
         enableMultiModel: false,
         chatMode: 'ask' as 'ask' | 'edit' | 'agent',
     };
@@ -750,7 +750,7 @@
 
     // 多模型对话
     let enableMultiModel = false; // 是否启用多模型模式
-    let selectedMultiModels: Array<{ provider: string; modelId: string }> = []; // 选中的多个模型
+    let selectedMultiModels: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }> = []; // 选中的多个模型
     let multiModelResponses: Array<{
         provider: string;
         modelId: string;
@@ -1306,10 +1306,8 @@
             temperatureEnabled: boolean;
             systemPrompt: string;
             modelSelectionEnabled?: boolean;
-            selectedModels?: Array<{ provider: string; modelId: string }>;
-            enableMultiModel?: boolean;
+            selectedModels?: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>;            enableMultiModel?: boolean;
             chatMode?: 'ask' | 'edit' | 'agent';
-            modelThinkingSettings?: Record<string, boolean>;
         }>
     ) {
         const newSettings = event.detail;
@@ -1324,31 +1322,11 @@
             selectedModels: newSettings.selectedModels || [],
             enableMultiModel: newSettings.enableMultiModel ?? false,
             chatMode: newSettings.chatMode ?? 'ask',
-            modelThinkingSettings: newSettings.modelThinkingSettings || {},
         };
 
         // 应用聊天模式
         if (newSettings.chatMode) {
             chatMode = newSettings.chatMode;
-        }
-
-        // 应用thinking设置
-        if (newSettings.modelThinkingSettings) {
-            // 更新每个模型的thinking设置
-            for (const [key, enabled] of Object.entries(newSettings.modelThinkingSettings)) {
-                const [provider, modelId] = key.split(':');
-                if (provider && modelId) {
-                    const providerConfig =
-                        providers[provider] ||
-                        providers.customProviders?.find(p => p.id === provider);
-                    if (providerConfig) {
-                        const model = providerConfig.models?.find(m => m.id === modelId);
-                        if (model) {
-                            model.thinkingEnabled = enabled;
-                        }
-                    }
-                }
-            }
         }
 
         // 如果启用了模型选择
@@ -1863,7 +1841,8 @@
                 thinking: '',
                 isLoading: true,
                 thinkingCollapsed: false,
-                thinkingEnabled: config?.modelConfig?.thinkingEnabled || false,
+                // 使用模型实例的 thinkingEnabled 值，如果没有则使用 modelConfig 中的默认值
+                thinkingEnabled: model.thinkingEnabled ?? config?.modelConfig?.thinkingEnabled ?? false,
             };
         });
 
@@ -1912,10 +1891,12 @@
                         maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                         stream: true,
                         signal: abortController.signal,
+                        // 使用模型实例的 thinkingEnabled 值
                         enableThinking:
                             modelConfig.capabilities?.thinking &&
-                            (modelConfig.thinkingEnabled || false),
-                        reasoningEffort: modelConfig.thinkingEffort || 'low',
+                            (model.thinkingEnabled ?? modelConfig.thinkingEnabled ?? false),
+                        // 使用模型实例的 thinkingEffort 值，如果没有则使用 modelConfig 中的默认值
+                        reasoningEffort: model.thinkingEffort ?? modelConfig.thinkingEffort ?? 'low',
                         customBody, // 传递自定义参数
                         onThinkingChunk: async (chunk: string) => {
                             thinking += chunk;

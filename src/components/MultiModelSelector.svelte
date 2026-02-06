@@ -1,10 +1,12 @@
 <script lang="ts">
     import { createEventDispatcher, onDestroy, onMount } from 'svelte';
     import type { ProviderConfig, CustomProviderConfig } from '../defaultSettings';
+    import type { ThinkingEffort } from '../ai-chat';
+    import { isGemini3Model } from '../ai-chat';
     import { t } from '../utils/i18n';
 
     export let providers: Record<string, any>;
-    export let selectedModels: Array<{ provider: string; modelId: string }> = [];
+    export let selectedModels: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }> = [];
     export let isOpen = false;
     export let enableMultiModel = false; // 是否启用多模型模式
     export let currentProvider = ''; // 单选模式当前选中的提供商
@@ -139,7 +141,10 @@
     function addModel(provider: string, modelId: string) {
         if (enableMultiModel) {
             // 多选模式：总是添加模型，允许重复选择
-            selectedModels = [...selectedModels, { provider, modelId }];
+            // 从 provider 配置中读取默认的 thinkingEnabled 和 thinkingEffort 值
+            const defaultThinkingEnabled = getProviderModelThinkingEnabled(provider, modelId);
+            const defaultThinkingEffort = getProviderModelThinkingEffort(provider, modelId);
+            selectedModels = [...selectedModels, { provider, modelId, thinkingEnabled: defaultThinkingEnabled, thinkingEffort: defaultThinkingEffort }];
             dispatch('change', selectedModels);
         } else {
             // 单选模式：选择模型后关闭下拉框
@@ -333,8 +338,8 @@
         return null;
     }
 
-    // 获取模型的 thinkingEnabled 状态（从 provider 配置中获取）
-    function getModelThinkingEnabled(provider: string, modelId: string): boolean {
+    // 获取模型的 thinkingEnabled 状态（从 provider 配置中获取，用作默认值）
+    function getProviderModelThinkingEnabled(provider: string, modelId: string): boolean {
         let providerConfig: any = null;
 
         // 查找内置平台
@@ -353,6 +358,26 @@
         return false;
     }
 
+    // 获取模型的 thinkingEffort 状态（从 provider 配置中获取，用作默认值）
+    function getProviderModelThinkingEffort(provider: string, modelId: string): ThinkingEffort {
+        let providerConfig: any = null;
+
+        // 查找内置平台
+        if (providers[provider] && !Array.isArray(providers[provider])) {
+            providerConfig = providers[provider];
+        } else if (providers.customProviders && Array.isArray(providers.customProviders)) {
+            // 查找自定义平台
+            providerConfig = providers.customProviders.find((p: any) => p.id === provider);
+        }
+
+        if (providerConfig && providerConfig.models) {
+            const model = providerConfig.models.find((m: any) => m.id === modelId);
+            return model?.thinkingEffort || 'low';
+        }
+
+        return 'low';
+    }
+
     // 获取模型能力的 emoji 字符串
     function getModelCapabilitiesEmoji(provider: string, modelId: string): string {
         const capabilities = getModelCapabilities(provider, modelId);
@@ -368,10 +393,27 @@
         return emojis.length > 0 ? ' ' + emojis.join(' ') : '';
     }
 
-    // 切换模型思考模式（派发事件修改 provider 设置）
-    function toggleModelThinking(provider: string, modelId: string) {
-        const currentEnabled = getModelThinkingEnabled(provider, modelId);
-        dispatch('toggleThinking', { provider, modelId, enabled: !currentEnabled });
+    // 切换模型实例的思考模式（直接修改实例状态）
+    function toggleModelInstanceThinking(index: number) {
+        const newModels = [...selectedModels];
+        newModels[index].thinkingEnabled = !newModels[index].thinkingEnabled;
+        selectedModels = newModels;
+        dispatch('change', selectedModels);
+    }
+
+    // 修改模型实例的思考程度
+    function changeModelInstanceThinkingEffort(index: number, effort: ThinkingEffort) {
+        const newModels = [...selectedModels];
+        newModels[index].thinkingEffort = effort;
+        selectedModels = newModels;
+        dispatch('change', selectedModels);
+    }
+
+    // 处理思考程度选择器的变化事件
+    function handleThinkingEffortChange(index: number, event: Event) {
+        const target = event.currentTarget as HTMLSelectElement;
+        const effort = target.value as ThinkingEffort;
+        changeModelInstanceThinkingEffort(index, effort);
     }
 
     // 获取已选择模型的名称列表（响应式）
@@ -672,20 +714,31 @@
                                                 <input
                                                     type="checkbox"
                                                     class="b3-switch"
-                                                    checked={getModelThinkingEnabled(
-                                                        model.provider,
-                                                        model.modelId
-                                                    )}
-                                                    on:change={() =>
-                                                        toggleModelThinking(
-                                                            model.provider,
-                                                            model.modelId
-                                                        )}
+                                                    checked={model.thinkingEnabled || false}
+                                                    on:change={() => toggleModelInstanceThinking(index)}
                                                 />
                                                 <span class="multi-model-selector__thinking-label">
                                                     思考
                                                 </span>
                                             </label>
+                                            {#if model.thinkingEnabled}
+                                                <select
+                                                    class="b3-select multi-model-selector__thinking-effort"
+                                                    value={model.thinkingEffort || 'low'}
+                                                    on:change={(e) => handleThinkingEffortChange(index, e)}
+                                                    on:click|stopPropagation
+                                                    title="思考程度"
+                                                >
+                                                    <option value="low">低</option>
+                                                    {#if !isGemini3Model(model.modelId)}
+                                                        <option value="medium">中</option>
+                                                    {/if}
+                                                    <option value="high">高</option>
+                                                    {#if !isGemini3Model(model.modelId)}
+                                                        <option value="auto">自动</option>
+                                                    {/if}
+                                                </select>
+                                            {/if}
                                         {/if}
                                     </div>
                                     <div class="multi-model-selector__selected-model-actions">
@@ -1224,6 +1277,9 @@
 
     .multi-model-selector__selected-model-thinking {
         flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
 
     .multi-model-selector__thinking-toggle {
@@ -1239,5 +1295,13 @@
     .multi-model-selector__thinking-label {
         font-size: 11px;
         color: var(--b3-theme-on-surface-light);
+    }
+
+    .multi-model-selector__thinking-effort {
+        font-size: 11px;
+        padding: 2px 4px;
+        border-radius: 3px;
+        cursor: pointer;
+        min-width: 50px;
     }
 </style>

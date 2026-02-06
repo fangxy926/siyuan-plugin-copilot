@@ -4,6 +4,7 @@
     import { pushMsg } from '@/api';
     import { confirm } from 'siyuan';
     import MultiModelSelector from './MultiModelSelector.svelte';
+    import type { ThinkingEffort } from '../ai-chat';
 
     export let providers: Record<string, any> = {};
     export let currentProvider = '';
@@ -14,10 +15,9 @@
         temperatureEnabled: true,
         systemPrompt: '',
         modelSelectionEnabled: false,
-        selectedModels: [] as Array<{ provider: string; modelId: string }>,
+        selectedModels: [] as Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>,
         enableMultiModel: false,
         chatMode: 'ask' as 'ask' | 'edit' | 'agent',
-        modelThinkingSettings: {} as Record<string, boolean>,
     };
     export let plugin: any;
 
@@ -42,10 +42,9 @@
     let tempTemperatureEnabled = false;
     let tempSystemPrompt = '';
     let tempModelSelectionEnabled = false;
-    let tempSelectedModels: Array<{ provider: string; modelId: string }> = [];
+    let tempSelectedModels: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }> = [];
     let tempEnableMultiModel = false;
     let tempChatMode: 'ask' | 'edit' | 'agent' = 'ask';
-    let tempModelThinkingSettings: Record<string, boolean> = {};
 
     // 当前正在编辑的预设ID（空字符串表示新建/默认）
     let editingPresetId = '';
@@ -59,10 +58,8 @@
         temperatureEnabled: boolean;
         systemPrompt: string;
         modelSelectionEnabled: boolean;
-        selectedModels: Array<{ provider: string; modelId: string }>;
-        enableMultiModel: boolean;
+        selectedModels: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>;        enableMultiModel: boolean;
         chatMode: 'ask' | 'edit' | 'agent';
-        modelThinkingSettings?: Record<string, boolean>;
         createdAt: number;
     }
 
@@ -89,10 +86,9 @@
         temperatureEnabled: true,
         systemPrompt: '',
         modelSelectionEnabled: false,
-        selectedModels: [] as Array<{ provider: string; modelId: string }>,
+        selectedModels: [] as Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>,
         enableMultiModel: false,
         chatMode: 'ask' as 'ask' | 'edit' | 'agent',
-        modelThinkingSettings: {} as Record<string, boolean>,
     };
 
     // 处理MultiModelSelector的选择事件（单模型模式）
@@ -104,7 +100,7 @@
     }
 
     // 处理MultiModelSelector的变化事件（多模型模式）
-    function handleModelsChange(event: CustomEvent<Array<{ provider: string; modelId: string }>>) {
+    function handleModelsChange(event: CustomEvent<Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>>) {
         tempSelectedModels = event.detail;
         applySettings();
     }
@@ -116,22 +112,6 @@
             tempSelectedModels = [];
         }
         applySettings();
-    }
-
-    // 处理MultiModelSelector的思考模式切换
-    function handleToggleThinking(
-        event: CustomEvent<{ provider: string; modelId: string; enabled: boolean }>
-    ) {
-        const { provider, modelId, enabled } = event.detail;
-        const key = `${provider}:${modelId}`;
-        tempModelThinkingSettings = {
-            ...tempModelThinkingSettings,
-            [key]: enabled,
-        };
-        applySettings();
-
-        // 同步到 providers 配置
-        dispatch('toggleThinking', { provider, modelId, enabled });
     }
 
     // 响应式过滤后的预设列表（支持空格分隔的 AND 搜索）
@@ -207,7 +187,7 @@
 
     // 格式化预设的模型列表显示
     function formatPresetModels(
-        selectedModels: Array<{ provider: string; modelId: string }>
+        selectedModels: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>
     ): string {
         const modelCounts: Record<string, number> = {};
         selectedModels.forEach(m => {
@@ -269,7 +249,6 @@
             selectedModels: tempSelectedModels,
             enableMultiModel: tempEnableMultiModel,
             chatMode: tempChatMode,
-            modelThinkingSettings: tempModelThinkingSettings,
             createdAt: Date.now(),
         };
 
@@ -314,7 +293,6 @@
                 selectedModels: preset.selectedModels || [],
                 enableMultiModel: preset.enableMultiModel ?? false,
                 chatMode: preset.chatMode || 'ask',
-                modelThinkingSettings: preset.modelThinkingSettings || {},
             });
 
             pushMsg(`已应用预设: ${preset.name}`);
@@ -336,7 +314,6 @@
         tempSelectedModels = [...(preset.selectedModels || [])];
         tempEnableMultiModel = preset.enableMultiModel ?? false;
         tempChatMode = preset.chatMode || 'ask';
-        tempModelThinkingSettings = { ...(preset.modelThinkingSettings || {}) };
 
         // 保存初始状态
         saveInitialState();
@@ -456,7 +433,6 @@
             selectedModels: tempSelectedModels,
             enableMultiModel: tempEnableMultiModel,
             chatMode: tempChatMode,
-            modelThinkingSettings: tempModelThinkingSettings,
         });
 
         // 注意：编辑预设时不自动保存，只有点击保存按钮才保存
@@ -464,25 +440,14 @@
 
     // 比较两个模型数组是否相等
     function areModelsEqual(
-        models1: Array<{ provider: string; modelId: string }>,
-        models2: Array<{ provider: string; modelId: string }>
+        models1: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>,
+        models2: Array<{ provider: string; modelId: string; thinkingEnabled?: boolean; thinkingEffort?: ThinkingEffort }>
     ): boolean {
         if (models1.length !== models2.length) return false;
         return models1.every((m1, index) => {
             const m2 = models2[index];
-            return m1.provider === m2.provider && m1.modelId === m2.modelId;
+            return m1.provider === m2.provider && m1.modelId === m2.modelId && m1.thinkingEnabled === m2.thinkingEnabled && m1.thinkingEffort === m2.thinkingEffort;
         });
-    }
-
-    // 比较两个thinking settings对象是否相等
-    function areThinkingSettingsEqual(
-        settings1: Record<string, boolean>,
-        settings2: Record<string, boolean>
-    ): boolean {
-        const keys1 = Object.keys(settings1);
-        const keys2 = Object.keys(settings2);
-        if (keys1.length !== keys2.length) return false;
-        return keys1.every(key => settings1[key] === settings2[key]);
     }
 
     // 更新预设
@@ -501,7 +466,6 @@
             preset.selectedModels = tempSelectedModels;
             preset.enableMultiModel = tempEnableMultiModel;
             preset.chatMode = tempChatMode;
-            preset.modelThinkingSettings = tempModelThinkingSettings;
             await savePresetsToStorage();
             // 触发响应式更新
             presets = [...presets];
@@ -522,7 +486,6 @@
         tempSelectedModels = [...(appliedSettings.selectedModels || [])];
         tempEnableMultiModel = appliedSettings.enableMultiModel ?? false;
         tempChatMode = appliedSettings.chatMode ?? 'ask';
-        tempModelThinkingSettings = { ...(appliedSettings.modelThinkingSettings || {}) };
 
         // 检查当前应用的设置是否与某个预设匹配
         const savedPresetId = await loadSelectedPresetId();
@@ -540,11 +503,7 @@
                 areModelsEqual(preset.selectedModels || [], appliedSettings.selectedModels || []) &&
                 (preset.enableMultiModel ?? false) ===
                     (appliedSettings.enableMultiModel ?? false) &&
-                (preset.chatMode || 'ask') === (appliedSettings.chatMode ?? 'ask') &&
-                areThinkingSettingsEqual(
-                    preset.modelThinkingSettings || {},
-                    appliedSettings.modelThinkingSettings || {}
-                )
+                (preset.chatMode || 'ask') === (appliedSettings.chatMode ?? 'ask')
             ) {
                 selectedPresetId = savedPresetId;
             } else {
@@ -566,7 +525,6 @@
         tempSelectedModels = [];
         tempEnableMultiModel = false;
         tempChatMode = 'ask';
-        tempModelThinkingSettings = {};
         editingPresetId = '';
         selectedPresetId = '';
         newPresetName = ''; // 重置预设名称为空
@@ -604,7 +562,6 @@
             selectedModels: [...tempSelectedModels],
             enableMultiModel: tempEnableMultiModel,
             chatMode: tempChatMode,
-            modelThinkingSettings: { ...tempModelThinkingSettings },
         };
     }
 
@@ -619,10 +576,6 @@
         if (tempEnableMultiModel !== initialState.enableMultiModel) return true;
         if (tempChatMode !== initialState.chatMode) return true;
         if (!areModelsEqual(tempSelectedModels, initialState.selectedModels)) return true;
-        if (
-            !areThinkingSettingsEqual(tempModelThinkingSettings, initialState.modelThinkingSettings)
-        )
-            return true;
         return false;
     }
 
@@ -818,7 +771,6 @@
                         selectedModels: [...(preset.selectedModels || [])],
                         enableMultiModel: preset.enableMultiModel ?? false,
                         chatMode: preset.chatMode || 'ask',
-                        modelThinkingSettings: { ...(preset.modelThinkingSettings || {}) },
                     });
                     selectedPresetId = savedPresetId;
                 } else {
@@ -1200,7 +1152,6 @@
                                 on:select={handleModelSelect}
                                 on:change={handleModelsChange}
                                 on:toggleEnable={handleToggleMultiModel}
-                                on:toggleThinking={handleToggleThinking}
                             />
                         </div>
                     {/if}

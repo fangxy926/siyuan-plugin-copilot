@@ -33,8 +33,8 @@ function isThinkingModel(modelId: string): boolean {
     if (/kimi.*thinking/.test(id)) return true;
     if (/kimi-k2\.5/.test(id)) return true;
 
-    // Gemini 2/3 系列（部分支持）
-    if (/gemini-[23]/.test(id)) return true;
+    // Gemini 2/3 系列（部分支持，排除图像模型）
+    if (/gemini-[23]/.test(id) && !/image/.test(id)) return true;
 
     // Claude Sonnet 4 系列
     if (/claude.*sonnet-4/.test(id)) return true;
@@ -136,11 +136,12 @@ function isImageGenerationModel(modelId: string): boolean {
     if (/midjourney/.test(id)) return true;
     if (/cogview/.test(id)) return true;
     if (/imagen/.test(id)) return true;
-    if (/nanobanana/.test(id)) return true;
-
+    
     // Gemini 图像生成模型
     if (/gemini.*-image/.test(id)) return true;
     if (/gemini-2\.0-flash-preview-image-generation/.test(id)) return true;
+    if (/nanobanana/.test(id)) return true;
+    if (/nano-?banana/.test(id)) return true;
 
     // Grok 图像模型
     if (/grok-2-image/.test(id)) return true;
