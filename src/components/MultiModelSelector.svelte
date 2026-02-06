@@ -48,6 +48,9 @@
     let draggedIndex: number | null = null;
     let dropIndicatorIndex: number | null = null;
 
+    // 追踪上一次的打开状态
+    let wasOpen = false;
+
     function getProviderList(): ProviderInfo[] {
         const list: ProviderInfo[] = [];
 
@@ -441,6 +444,11 @@
 
     // 监听打开状态，绑定点击关闭以及窗口尺寸变化以调整下拉位置/高度
     $: if (isOpen) {
+        // 只在从关闭状态切换到打开状态时清空搜索关键词
+        if (!wasOpen) {
+            modelSearchQuery = '';
+            wasOpen = true;
+        }
         setTimeout(() => {
             document.addEventListener('click', closeOnOutsideClick);
             // initial position update
@@ -450,6 +458,7 @@
             window.addEventListener('resize', _resizeHandler);
         }, 0);
     } else {
+        wasOpen = false;
         document.removeEventListener('click', closeOnOutsideClick);
         if (_resizeHandler) window.removeEventListener('resize', _resizeHandler);
         // clear inline styles when closed
@@ -732,6 +741,7 @@
                         class="b3-text-field"
                         placeholder={t('multiModel.searchModels') || '搜索模型'}
                         bind:value={modelSearchQuery}
+                        spellcheck="false"
                     />
                 </div>
 
