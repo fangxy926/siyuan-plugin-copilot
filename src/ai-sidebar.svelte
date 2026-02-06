@@ -890,13 +890,13 @@
                 if (newSettings.messageFontSize !== undefined) {
                     messageFontSize = newSettings.messageFontSize;
                 }
-                
+
                 // 实时更新多模型视图样式设置
                 if (newSettings.multiModelViewMode !== undefined) {
                     multiModelViewMode = newSettings.multiModelViewMode;
                     multiModelLayout = newSettings.multiModelViewMode; // 同步更新多模型布局
                 }
-                
+
                 // 更新系统提示词
                 if (settings.aiSystemPrompt && messages.length === 0) {
                     messages = [{ role: 'system', content: settings.aiSystemPrompt }];
@@ -8377,7 +8377,8 @@
                         <!-- 显示多模型响应（历史消息） - 仅在用户已选择答案后显示 -->
                         {#if message.role === 'assistant' && message.multiModelResponses && message.multiModelResponses.length > 0 && message.multiModelResponses.some(r => r.isSelected)}
                             {@const layoutKey = `history_layout_${messageIndex}_${msgIndex}`}
-                            {@const currentLayout = thinkingCollapsed[layoutKey] || multiModelViewMode}
+                            {@const currentLayout =
+                                thinkingCollapsed[layoutKey] || multiModelViewMode}
                             <div class="ai-message__multi-model-responses">
                                 <div class="ai-message__multi-model-header">
                                     <div class="ai-message__multi-model-header-top">
@@ -9040,7 +9041,9 @@
                             on:click={() => openSaveToNoteDialog(messageIndex)}
                             title={t('aiSidebar.actions.saveToNote')}
                         >
-                            <svg class="b3-button__icon"><use xlink:href="#iconDownload"></use></svg>
+                            <svg class="b3-button__icon">
+                                <use xlink:href="#iconDownload"></use>
+                            </svg>
                         </button>
                         <button
                             class="b3-button b3-button--text ai-message__action"
