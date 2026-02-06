@@ -480,11 +480,30 @@
         // 将下拉设为 fixed，方便根据视口定位
         dropdownEl.style.position = 'fixed';
 
-        // 水平对齐：保持和触发按钮右对齐（如果空间不足则左对齐）
-        // 先尝试右对齐
-        const tryRight = window.innerWidth - rect.right;
-        dropdownEl.style.right = `${tryRight}px`;
-        dropdownEl.style.left = 'auto';
+        // 水平对齐：智能定位，避免超出屏幕边界
+        // 先获取弹窗实际宽度
+        const dropdownWidth = dropdownEl.offsetWidth || 320;
+        
+        // 尝试右对齐（弹窗右边缘与按钮右边缘对齐）
+        let left = rect.right - dropdownWidth;
+        
+        // 如果右对齐后超出左边界，则调整为左边界 + margin
+        if (left < margin) {
+            left = margin;
+        }
+        
+        // 如果仍然超出右边界，则调整为右边界 - dropdownWidth - margin
+        if (left + dropdownWidth > window.innerWidth - margin) {
+            left = window.innerWidth - dropdownWidth - margin;
+        }
+        
+        // 确保不超出左边界
+        if (left < margin) {
+            left = margin;
+        }
+        
+        dropdownEl.style.left = `${left}px`;
+        dropdownEl.style.right = 'auto';
 
         // 垂直方向：优先选择空间更大的一侧（下方或上方）
         if (availableBelow >= availableAbove) {
