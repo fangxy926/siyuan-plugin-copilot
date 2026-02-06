@@ -350,6 +350,21 @@
         return false;
     }
 
+    // 获取模型能力的 emoji 字符串
+    function getModelCapabilitiesEmoji(provider: string, modelId: string): string {
+        const capabilities = getModelCapabilities(provider, modelId);
+        if (!capabilities) return '';
+
+        const emojis: string[] = [];
+        if (capabilities.thinking) emojis.push('💡');
+        if (capabilities.vision) emojis.push('👀');
+        if (capabilities.imageGeneration) emojis.push('🖼️');
+        if (capabilities.toolCalling) emojis.push('🛠️');
+        if (capabilities.webSearch) emojis.push('🌐');
+
+        return emojis.length > 0 ? ' ' + emojis.join(' ') : '';
+    }
+
     // 切换模型思考模式（派发事件修改 provider 设置）
     function toggleModelThinking(provider: string, modelId: string) {
         const currentEnabled = getModelThinkingEnabled(provider, modelId);
@@ -621,7 +636,13 @@
                                     </div>
                                     <div class="multi-model-selector__selected-model-info">
                                         <span class="multi-model-selector__selected-model-name">
-                                            {getModelName(model.provider, model.modelId)}
+                                            {getModelName(
+                                                model.provider,
+                                                model.modelId
+                                            )}{getModelCapabilitiesEmoji(
+                                                model.provider,
+                                                model.modelId
+                                            )}
                                         </span>
                                         <span class="multi-model-selector__selected-model-provider">
                                             {getProviderDisplayName(model.provider)}
@@ -785,7 +806,10 @@
                                                     </span>
                                                 {/if}
                                                 <span class="multi-model-selector__model-name">
-                                                    {model.name}
+                                                    {model.name}{getModelCapabilitiesEmoji(
+                                                        provider.id,
+                                                        model.id
+                                                    )}
                                                 </span>
                                             </div>
                                             <span class="multi-model-selector__model-params">

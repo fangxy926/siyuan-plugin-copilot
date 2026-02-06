@@ -682,7 +682,7 @@
                                             );
                                         }}
                                     />
-                                    <span class="capability-label">{t('models.thinking')}</span>
+                                    <span class="capability-label">💡 {t('models.thinking')}</span>
                                 </label>
                                 <label class="">
                                     <input
@@ -699,7 +699,7 @@
                                             );
                                         }}
                                     />
-                                    <span class="capability-label">{t('models.vision')}</span>
+                                    <span class="capability-label">👀 {t('models.vision')}</span>
                                 </label>
                                 <label class="">
                                     <input
@@ -718,7 +718,7 @@
                                         }}
                                     />
                                     <span class="capability-label">
-                                        {t('models.imageGeneration')}
+                                        🖼️ {t('models.imageGeneration')}
                                     </span>
                                 </label>
                                 <label class="">
@@ -737,7 +737,9 @@
                                             );
                                         }}
                                     />
-                                    <span class="capability-label">{t('models.toolCalling')}</span>
+                                    <span class="capability-label">
+                                        🛠️ {t('models.toolCalling')}
+                                    </span>
                                 </label>
                                 <label class="">
                                     <input
@@ -754,7 +756,7 @@
                                             );
                                         }}
                                     />
-                                    <span class="capability-label">{t('models.webSearch')}</span>
+                                    <span class="capability-label">🌐 {t('models.webSearch')}</span>
                                 </label>
                             </div>
                         </div>
