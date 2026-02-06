@@ -6290,7 +6290,7 @@
                 }
 
                 messages = [...loadedMessages];
-                
+
                 // 【修复】检查多模型响应是否缺少选择，自动设置第一个非错误模型为选中
                 for (const msg of messages) {
                     if (
@@ -6326,7 +6326,7 @@
                         }
                     }
                 }
-                
+
                 // 清空全局上下文文档（上下文现在存储在各个消息中）
                 contextDocuments = [];
                 // 确保系统提示词存在且是最新的
@@ -8363,180 +8363,361 @@
 
                         <!-- 显示多模型响应（历史消息） - 仅在用户已选择答案后显示 -->
                         {#if message.role === 'assistant' && message.multiModelResponses && message.multiModelResponses.length > 0 && message.multiModelResponses.some(r => r.isSelected)}
+                            {@const layoutKey = `history_layout_${messageIndex}_${msgIndex}`}
+                            {@const currentLayout = thinkingCollapsed[layoutKey] || 'tab'}
                             <div class="ai-message__multi-model-responses">
                                 <div class="ai-message__multi-model-header">
-                                    <h4>🤖 多模型响应</h4>
-                                </div>
-                                <!-- 使用页签样式显示历史多模型响应 -->
-                                <div class="ai-message__multi-model-tabs">
-                                    <div class="ai-message__multi-model-tab-headers">
-                                        {#each message.multiModelResponses as response, index}
-                                            {@const tabKey = `history_multi_${messageIndex}_${msgIndex}`}
-                                            {@const currentTabIndex =
-                                                thinkingCollapsed[`${tabKey}_selectedTab`] ??
-                                                message.multiModelResponses.findIndex(
-                                                    r => r.isSelected
-                                                ) ??
-                                                0}
+                                    <div class="ai-message__multi-model-header-top">
+                                        <h4>🤖 多模型响应</h4>
+                                        <div class="ai-message__multi-model-layout-selector">
                                             <button
-                                                class="ai-message__multi-model-tab-header"
-                                                class:ai-message__multi-model-tab-header--active={currentTabIndex ===
-                                                    index}
+                                                class="b3-button b3-button--text b3-button--small"
+                                                class:b3-button--primary={currentLayout === 'card'}
                                                 on:click={() => {
-                                                    thinkingCollapsed[`${tabKey}_selectedTab`] =
-                                                        index;
+                                                    thinkingCollapsed[layoutKey] = 'card';
                                                     thinkingCollapsed = { ...thinkingCollapsed };
                                                 }}
+                                                title={t('multiModel.layout.card')}
                                             >
-                                                <span class="ai-message__multi-model-tab-title">
-                                                    {response.modelName}
-                                                </span>
-                                                {#if response.error}
-                                                    <span
-                                                        class="ai-message__multi-model-tab-status ai-message__multi-model-tab-status--error"
-                                                    >
-                                                        ❌
-                                                    </span>
-                                                {/if}
+                                                <svg class="b3-button__icon">
+                                                    <use xlink:href="#iconSplitLR"></use>
+                                                </svg>
+                                                {t('multiModel.layout.card')}
                                             </button>
-                                        {/each}
+                                            <button
+                                                class="b3-button b3-button--text b3-button--small"
+                                                class:b3-button--primary={currentLayout === 'tab'}
+                                                on:click={() => {
+                                                    thinkingCollapsed[layoutKey] = 'tab';
+                                                    thinkingCollapsed = { ...thinkingCollapsed };
+                                                }}
+                                                title={t('multiModel.layout.tab')}
+                                            >
+                                                <svg class="b3-button__icon">
+                                                    <use xlink:href="#iconSplitTB"></use>
+                                                </svg>
+                                                {t('multiModel.layout.tab')}
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div class="ai-message__multi-model-tab-content">
-                                        {#each message.multiModelResponses as response, index}
-                                            {@const tabKey = `history_multi_${messageIndex}_${msgIndex}`}
-                                            {@const currentTabIndex =
-                                                thinkingCollapsed[`${tabKey}_selectedTab`] ??
-                                                message.multiModelResponses.findIndex(
-                                                    r => r.isSelected
-                                                ) ??
-                                                0}
-                                            {#if currentTabIndex === index}
-                                                <div class="ai-message__multi-model-tab-panel">
-                                                    <!-- 添加面板头部，包含复制按钮 -->
-                                                    <div
-                                                        class="ai-message__multi-model-tab-panel-header"
-                                                    >
-                                                        <div
-                                                            class="ai-message__multi-model-tab-panel-title"
-                                                        >
-                                                            <span
-                                                                class="ai-message__multi-model-tab-panel-model-name"
-                                                            >
-                                                                {response.modelName}
-                                                            </span>
-                                                        </div>
-                                                        <div
-                                                            class="ai-message__multi-model-tab-panel-actions"
-                                                        >
-                                                            {#if !response.error && response.content}
-                                                                <button
-                                                                    class="b3-button b3-button--text"
-                                                                    on:click={() =>
-                                                                        regenerateHistoryModelResponse(
-                                                                            messageIndex + msgIndex,
-                                                                            index
-                                                                        )}
-                                                                    title={t(
-                                                                        'aiSidebar.actions.regenerate'
-                                                                    )}
-                                                                >
-                                                                    <svg class="b3-button__icon">
-                                                                        <use
-                                                                            xlink:href="#iconRefresh"
-                                                                        ></use>
-                                                                    </svg>
-                                                                </button>
-                                                                <button
-                                                                    class="b3-button b3-button--text ai-sidebar__multi-model-copy-btn"
-                                                                    on:click={() =>
-                                                                        copyMessage(
-                                                                            response.content || ''
-                                                                        )}
-                                                                    title={t(
-                                                                        'aiSidebar.actions.copyMessage'
-                                                                    )}
-                                                                >
-                                                                    <svg class="b3-button__icon">
-                                                                        <use
-                                                                            xlink:href="#iconCopy"
-                                                                        ></use>
-                                                                    </svg>
-                                                                </button>
-                                                            {/if}
-                                                        </div>
-                                                    </div>
+                                </div>
 
-                                                    {#if response.thinking}
-                                                        {@const isCollapsed =
-                                                            response.thinkingCollapsed ?? true}
-                                                        <div class="ai-message__thinking">
-                                                            <div
-                                                                class="ai-message__thinking-header"
-                                                                on:click={() => {
-                                                                    message.multiModelResponses[
-                                                                        index
-                                                                    ].thinkingCollapsed =
-                                                                        !isCollapsed;
-                                                                    messages = [...messages];
-                                                                }}
+                                {#if currentLayout === 'card'}
+                                    <!-- 卡片视图 -->
+                                    <div class="ai-sidebar__multi-model-cards">
+                                        {#each message.multiModelResponses as response, index}
+                                            <div
+                                                class="ai-sidebar__multi-model-card"
+                                                class:ai-sidebar__multi-model-card--selected={response.isSelected}
+                                            >
+                                                <div class="ai-sidebar__multi-model-card-header">
+                                                    <div class="ai-sidebar__multi-model-card-title">
+                                                        <span
+                                                            class="ai-sidebar__multi-model-card-model-name"
+                                                        >
+                                                            {response.modelName}
+                                                        </span>
+                                                        {#if response.error}
+                                                            <span
+                                                                class="ai-sidebar__multi-model-card-status ai-sidebar__multi-model-card-status--error"
                                                             >
-                                                                <svg
-                                                                    class="ai-message__thinking-icon"
-                                                                    class:collapsed={isCollapsed}
-                                                                >
+                                                                ❌ {t('multiModel.error')}
+                                                            </span>
+                                                        {/if}
+                                                    </div>
+                                                    <div
+                                                        class="ai-sidebar__multi-model-card-actions"
+                                                    >
+                                                        {#if !response.error && response.content}
+                                                            <button
+                                                                class="b3-button b3-button--text"
+                                                                on:click={() =>
+                                                                    regenerateHistoryModelResponse(
+                                                                        messageIndex + msgIndex,
+                                                                        index
+                                                                    )}
+                                                                title={t(
+                                                                    'aiSidebar.actions.regenerate'
+                                                                )}
+                                                            >
+                                                                <svg class="b3-button__icon">
                                                                     <use
-                                                                        xlink:href="#iconRight"
+                                                                        xlink:href="#iconRefresh"
                                                                     ></use>
                                                                 </svg>
-                                                                <span
-                                                                    class="ai-message__thinking-title"
-                                                                >
-                                                                    💭 思考过程
-                                                                </span>
-                                                            </div>
-                                                            {#if !isCollapsed}
-                                                                {@const thinkingDisplay =
-                                                                    getDisplayContent(
-                                                                        response.thinking
+                                                            </button>
+                                                            <button
+                                                                class="b3-button b3-button--text ai-sidebar__multi-model-copy-btn"
+                                                                on:click={() =>
+                                                                    copyMessage(
+                                                                        response.content || ''
                                                                     )}
-                                                                <div
-                                                                    class="ai-message__thinking-content b3-typography"
-                                                                >
-                                                                    {@html thinkingDisplay}
-                                                                </div>
-                                                            {/if}
-                                                        </div>
-                                                    {/if}
-
-                                                    <div
-                                                        class="ai-message__multi-model-tab-panel-content b3-typography"
-                                                        style={messageFontSize
-                                                            ? `font-size: ${messageFontSize}px;`
-                                                            : ''}
-                                                        on:contextmenu={e =>
-                                                            handleContextMenu(
-                                                                e,
-                                                                messageIndex + msgIndex,
-                                                                'assistant'
-                                                            )}
-                                                    >
-                                                        {#if response.error}
-                                                            <div
-                                                                class="ai-message__multi-model-tab-panel-error"
+                                                                title={t(
+                                                                    'aiSidebar.actions.copyMessage'
+                                                                )}
                                                             >
-                                                                {response.error}
-                                                            </div>
-                                                        {:else if response.content}
-                                                            {@const contentDisplay =
-                                                                getDisplayContent(response.content)}
-                                                            {@html contentDisplay}
+                                                                <svg class="b3-button__icon">
+                                                                    <use
+                                                                        xlink:href="#iconCopy"
+                                                                    ></use>
+                                                                </svg>
+                                                            </button>
                                                         {/if}
                                                     </div>
                                                 </div>
-                                            {/if}
+
+                                                <!-- 思考过程 -->
+                                                {#if response.thinking}
+                                                    {@const isCollapsed =
+                                                        response.thinkingCollapsed ?? true}
+                                                    <div class="ai-message__thinking">
+                                                        <div
+                                                            class="ai-message__thinking-header"
+                                                            on:click={() => {
+                                                                message.multiModelResponses[
+                                                                    index
+                                                                ].thinkingCollapsed = !isCollapsed;
+                                                                messages = [...messages];
+                                                            }}
+                                                        >
+                                                            <svg
+                                                                class="ai-message__thinking-icon"
+                                                                class:collapsed={isCollapsed}
+                                                            >
+                                                                <use xlink:href="#iconRight"></use>
+                                                            </svg>
+                                                            <span
+                                                                class="ai-message__thinking-title"
+                                                            >
+                                                                💭 {t(
+                                                                    'aiSidebar.messages.thinking'
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                        {#if !isCollapsed}
+                                                            {@const thinkingDisplay =
+                                                                getDisplayContent(
+                                                                    response.thinking
+                                                                )}
+                                                            <div
+                                                                class="ai-message__thinking-content b3-typography"
+                                                            >
+                                                                {@html thinkingDisplay}
+                                                            </div>
+                                                        {/if}
+                                                    </div>
+                                                {/if}
+
+                                                <div
+                                                    class="ai-sidebar__multi-model-card-content b3-typography"
+                                                    style={messageFontSize
+                                                        ? `font-size: ${messageFontSize}px;`
+                                                        : ''}
+                                                    on:contextmenu={e =>
+                                                        handleContextMenu(
+                                                            e,
+                                                            messageIndex + msgIndex,
+                                                            'assistant'
+                                                        )}
+                                                >
+                                                    {#if response.error}
+                                                        <div
+                                                            class="ai-sidebar__multi-model-card-error"
+                                                        >
+                                                            {response.error}
+                                                        </div>
+                                                    {:else if response.content}
+                                                        {@const contentDisplay = getDisplayContent(
+                                                            response.content
+                                                        )}
+                                                        {@html contentDisplay}
+                                                    {/if}
+                                                </div>
+                                            </div>
                                         {/each}
                                     </div>
-                                </div>
+                                {:else}
+                                    <!-- 页签视图 -->
+                                    <div class="ai-message__multi-model-tabs">
+                                        <div class="ai-message__multi-model-tab-headers">
+                                            {#each message.multiModelResponses as response, index}
+                                                {@const tabKey = `history_multi_${messageIndex}_${msgIndex}`}
+                                                {@const currentTabIndex =
+                                                    thinkingCollapsed[`${tabKey}_selectedTab`] ??
+                                                    message.multiModelResponses.findIndex(
+                                                        r => r.isSelected
+                                                    ) ??
+                                                    0}
+                                                <button
+                                                    class="ai-message__multi-model-tab-header"
+                                                    class:ai-message__multi-model-tab-header--active={currentTabIndex ===
+                                                        index}
+                                                    on:click={() => {
+                                                        thinkingCollapsed[`${tabKey}_selectedTab`] =
+                                                            index;
+                                                        thinkingCollapsed = {
+                                                            ...thinkingCollapsed,
+                                                        };
+                                                    }}
+                                                >
+                                                    <span class="ai-message__multi-model-tab-title">
+                                                        {response.modelName}
+                                                    </span>
+                                                    {#if response.error}
+                                                        <span
+                                                            class="ai-message__multi-model-tab-status ai-message__multi-model-tab-status--error"
+                                                        >
+                                                            ❌
+                                                        </span>
+                                                    {/if}
+                                                </button>
+                                            {/each}
+                                        </div>
+                                        <div class="ai-message__multi-model-tab-content">
+                                            {#each message.multiModelResponses as response, index}
+                                                {@const tabKey = `history_multi_${messageIndex}_${msgIndex}`}
+                                                {@const currentTabIndex =
+                                                    thinkingCollapsed[`${tabKey}_selectedTab`] ??
+                                                    message.multiModelResponses.findIndex(
+                                                        r => r.isSelected
+                                                    ) ??
+                                                    0}
+                                                {#if currentTabIndex === index}
+                                                    <div class="ai-message__multi-model-tab-panel">
+                                                        <!-- 添加面板头部，包含复制按钮 -->
+                                                        <div
+                                                            class="ai-message__multi-model-tab-panel-header"
+                                                        >
+                                                            <div
+                                                                class="ai-message__multi-model-tab-panel-title"
+                                                            >
+                                                                <span
+                                                                    class="ai-message__multi-model-tab-panel-model-name"
+                                                                >
+                                                                    {response.modelName}
+                                                                </span>
+                                                            </div>
+                                                            <div
+                                                                class="ai-message__multi-model-tab-panel-actions"
+                                                            >
+                                                                {#if !response.error && response.content}
+                                                                    <button
+                                                                        class="b3-button b3-button--text"
+                                                                        on:click={() =>
+                                                                            regenerateHistoryModelResponse(
+                                                                                messageIndex +
+                                                                                    msgIndex,
+                                                                                index
+                                                                            )}
+                                                                        title={t(
+                                                                            'aiSidebar.actions.regenerate'
+                                                                        )}
+                                                                    >
+                                                                        <svg
+                                                                            class="b3-button__icon"
+                                                                        >
+                                                                            <use
+                                                                                xlink:href="#iconRefresh"
+                                                                            ></use>
+                                                                        </svg>
+                                                                    </button>
+                                                                    <button
+                                                                        class="b3-button b3-button--text ai-sidebar__multi-model-copy-btn"
+                                                                        on:click={() =>
+                                                                            copyMessage(
+                                                                                response.content ||
+                                                                                    ''
+                                                                            )}
+                                                                        title={t(
+                                                                            'aiSidebar.actions.copyMessage'
+                                                                        )}
+                                                                    >
+                                                                        <svg
+                                                                            class="b3-button__icon"
+                                                                        >
+                                                                            <use
+                                                                                xlink:href="#iconCopy"
+                                                                            ></use>
+                                                                        </svg>
+                                                                    </button>
+                                                                {/if}
+                                                            </div>
+                                                        </div>
+
+                                                        {#if response.thinking}
+                                                            {@const isCollapsed =
+                                                                response.thinkingCollapsed ?? true}
+                                                            <div class="ai-message__thinking">
+                                                                <div
+                                                                    class="ai-message__thinking-header"
+                                                                    on:click={() => {
+                                                                        message.multiModelResponses[
+                                                                            index
+                                                                        ].thinkingCollapsed =
+                                                                            !isCollapsed;
+                                                                        messages = [...messages];
+                                                                    }}
+                                                                >
+                                                                    <svg
+                                                                        class="ai-message__thinking-icon"
+                                                                        class:collapsed={isCollapsed}
+                                                                    >
+                                                                        <use
+                                                                            xlink:href="#iconRight"
+                                                                        ></use>
+                                                                    </svg>
+                                                                    <span
+                                                                        class="ai-message__thinking-title"
+                                                                    >
+                                                                        💭 思考过程
+                                                                    </span>
+                                                                </div>
+                                                                {#if !isCollapsed}
+                                                                    {@const thinkingDisplay =
+                                                                        getDisplayContent(
+                                                                            response.thinking
+                                                                        )}
+                                                                    <div
+                                                                        class="ai-message__thinking-content b3-typography"
+                                                                    >
+                                                                        {@html thinkingDisplay}
+                                                                    </div>
+                                                                {/if}
+                                                            </div>
+                                                        {/if}
+
+                                                        <div
+                                                            class="ai-message__multi-model-tab-panel-content b3-typography"
+                                                            style={messageFontSize
+                                                                ? `font-size: ${messageFontSize}px;`
+                                                                : ''}
+                                                            on:contextmenu={e =>
+                                                                handleContextMenu(
+                                                                    e,
+                                                                    messageIndex + msgIndex,
+                                                                    'assistant'
+                                                                )}
+                                                        >
+                                                            {#if response.error}
+                                                                <div
+                                                                    class="ai-message__multi-model-tab-panel-error"
+                                                                >
+                                                                    {response.error}
+                                                                </div>
+                                                            {:else if response.content}
+                                                                {@const contentDisplay =
+                                                                    getDisplayContent(
+                                                                        response.content
+                                                                    )}
+                                                                {@html contentDisplay}
+                                                            {/if}
+                                                        </div>
+                                                    </div>
+                                                {/if}
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/if}
                             </div>
                         {/if}
 
@@ -8952,7 +9133,7 @@
                                 title={t('multiModel.layout.card')}
                             >
                                 <svg class="b3-button__icon">
-                                    <use xlink:href="#iconLayout"></use>
+                                    <use xlink:href="#iconSplitLR"></use>
                                 </svg>
                                 {t('multiModel.layout.card')}
                             </button>
@@ -8963,7 +9144,7 @@
                                 title={t('multiModel.layout.tab')}
                             >
                                 <svg class="b3-button__icon">
-                                    <use xlink:href="#iconTab"></use>
+                                    <use xlink:href="#iconSplitTB"></use>
                                 </svg>
                                 {t('multiModel.layout.tab')}
                             </button>
@@ -12615,6 +12796,7 @@
         flex: 0 0 50%;
         max-width: 400px;
         min-width: 300px;
+        max-height: 70vh;
         display: flex;
         flex-direction: column;
         gap: 8px;
@@ -12632,7 +12814,6 @@
 
         &--selected {
             border-color: var(--b3-theme-primary);
-            background: var(--b3-theme-primary-lightest);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
     }
@@ -12644,6 +12825,10 @@
         gap: 8px;
         padding-bottom: 8px;
         border-bottom: 1px solid var(--b3-border-color);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--b3-theme-background);
     }
 
     .ai-sidebar__multi-model-card-title {
@@ -12771,6 +12956,10 @@
         overflow-x: auto;
         scrollbar-width: none;
         -ms-overflow-style: none;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--b3-theme-surface);
 
         &::-webkit-scrollbar {
             display: none;
@@ -12947,6 +13136,19 @@
         }
     }
 
+    .ai-message__multi-model-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .ai-message__multi-model-layout-selector {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+    }
+
     // 历史消息中的多模型页签样式
     .ai-message__multi-model-tabs {
         display: flex;
@@ -12961,6 +13163,10 @@
         overflow-x: auto;
         scrollbar-width: none;
         -ms-overflow-style: none;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--b3-theme-surface);
 
         &::-webkit-scrollbar {
             display: none;
@@ -13109,78 +13315,6 @@
             border-color: var(--b3-theme-success);
             background: var(--b3-theme-success-lightest);
         }
-    }
-
-    .ai-message__multi-model-card-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid var(--b3-border-color);
-    }
-
-    .ai-message__multi-model-card-title {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex: 1;
-    }
-
-    .ai-message__multi-model-card-model-name {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--b3-theme-on-background);
-    }
-
-    .ai-message__multi-model-selected-indicator {
-        color: var(--b3-theme-success);
-        font-size: 14px;
-    }
-
-    .ai-message__multi-model-card-status {
-        font-size: 11px;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-weight: 500;
-
-        &--error {
-            background: var(--b3-theme-error-lighter);
-            color: var(--b3-theme-error);
-        }
-    }
-
-    .ai-message__multi-model-card-content {
-        flex: 1;
-        overflow-y: auto;
-        padding: 4px;
-
-        &::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        &::-webkit-scrollbar-track {
-            background: var(--b3-theme-surface);
-            border-radius: 3px;
-        }
-
-        &::-webkit-scrollbar-thumb {
-            background: var(--b3-theme-on-surface-light);
-            border-radius: 3px;
-
-            &:hover {
-                background: var(--b3-theme-on-surface);
-            }
-        }
-    }
-
-    .ai-message__multi-model-card-error {
-        color: var(--b3-theme-error);
-        font-size: 12px;
-        padding: 12px;
-        background: var(--b3-theme-error-lighter);
-        border-radius: 4px;
-        word-break: break-word;
     }
 
     // 响应式布局
