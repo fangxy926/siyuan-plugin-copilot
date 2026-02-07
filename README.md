@@ -17,10 +17,12 @@
 见[CHANGELOG.md](https://cdn.jsdelivr.net/gh/Achuan-2/siyuan-plugin-copilot@main/CHANGELOG.md)
 
 博客
-- [思源笔记Copilot插件用法分享：多模型同时回答](https://zhuanlan.zhihu.com/p/1972794055470633397)
+- [思源笔记 Copilot 插件用法分享：多模型同时回答](https://zhuanlan.zhihu.com/p/1972794055470633397)
 - [思源笔记 Copilot 插件 v0.7.0：支持会话重命名标题，AI 自动生成标题](https://zhuanlan.zhihu.com/p/1983095685197873937)
 - [思源笔记 Copilot 插件 v0.8.0：预设支持选择模型，支持根据场景快速切换模型](https://zhuanlan.zhihu.com/p/1983121374013842503)
-- [思源笔记Copilot插件 v1.2.0：支持nanobanana生图和编辑图片](https://zhuanlan.zhihu.com/p/2000977023364011834)
+- [思源笔记 Copilot 插件 v1.2.0：支持nanobanana生图和编辑图片](https://zhuanlan.zhihu.com/p/2000977023364011834)
+- [思源笔记 Copilot 插件如何使用Achuan-2 API](https://zhuanlan.zhihu.com/p/2002765436090093989)
+- [思源笔记 Copilot 插件 v1.6.0：新增网页小程序、快捷翻译对话框](https://zhuanlan.zhihu.com/p/2003514802849485761)
 
 ## ✨主要功能介绍
 
@@ -128,7 +130,8 @@ GPL3 License
 ## 🙏 致谢
 
 - 基于 [plugin-sample-vite-svelte](https://github.com/siyuan-note/plugin-sample-vite-svelte/) 模板开发
-- 参考了 [sy-f-misc](https://github.com/frostime/sy-f-misc)的GPT对话功能实现
+- 参考了[sy-f-misc](https://github.com/frostime/sy-f-misc)的GPT对话功能实现
+- 参考了[cherry studio](https://github.com/CherryHQ/cherry-studio)的功能设计和交互设计
 
 ## ❤️项目贡献者
 
