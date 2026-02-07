@@ -28,7 +28,7 @@ import AISidebar from "./ai-sidebar.svelte";
 import ChatDialog from "./components/ChatDialog.svelte";
 import { updateSettings } from "./stores/settings";
 import { getModelCapabilities } from "./utils/modelCapabilities";
-import { matchHotKey } from "./utils/hotkey";
+import { matchHotKey, getCustomHotKey } from "./utils/hotkey";
 
 export const SETTINGS_FILE = "settings.json";
 
@@ -237,7 +237,8 @@ export default class PluginSample extends Plugin {
                     // 键盘事件处理
                     const handleKeydown = (e: KeyboardEvent) => {
                         // Alt+Y 切换全屏
-                        if (matchHotKey(window.siyuan.config.keymap.editor.general.fullscreen, e)) {
+                        const fullscreenHotkey = getCustomHotKey(window.siyuan.config.keymap.editor.general.fullscreen);
+                        if (matchHotKey(fullscreenHotkey, e)) {
                             e.preventDefault();
                             e.stopPropagation();
                             toggleFullscreen();
@@ -353,8 +354,10 @@ export default class PluginSample extends Plugin {
             }
         });
         // 注册已保存的小程序图标
+        // 由于 onload() 中已经调用了 loadSettings()，
+        // 这里直接再次调用 loadSettings() 以获取合并后的设置（包含默认的内置 webApps）
         try {
-            const settings = await this.loadData(SETTINGS_FILE);
+            const settings = await this.loadSettings();
             if (settings?.webApps && Array.isArray(settings.webApps)) {
                 for (const app of settings.webApps) {
                     if (app.icon && app.icon.startsWith('data:image')) {
@@ -592,6 +595,31 @@ export default class PluginSample extends Plugin {
 
         const defaultSettings = getDefaultSettings();
         const mergedSettings = { ...defaultSettings, ...settings };
+
+        // 检测是否需要保存设置
+        let needsSave = false;
+
+        // 如果是首次安装（settings.json 不存在或为空），需要保存
+        const isFirstInstall = !settings || Object.keys(settings).length === 0;
+        if (isFirstInstall) {
+            needsSave = true;
+        }
+
+        // 如果是升级场景：settings 存在但没有 webApps，或 webApps 为空
+        // 需要从默认设置中补充内置 webApps
+        if (settings && (!settings.webApps || !Array.isArray(settings.webApps) || settings.webApps.length === 0)) {
+            // 从默认设置中获取内置 webApps
+            if (defaultSettings.webApps && Array.isArray(defaultSettings.webApps) && defaultSettings.webApps.length > 0) {
+                mergedSettings.webApps = defaultSettings.webApps;
+                needsSave = true;
+            }
+        }
+
+        // 保存合并后的设置，确保内置 webApps 能在 onLayoutReady 中正确注册
+        if (needsSave) {
+            await this.saveData(SETTINGS_FILE, mergedSettings);
+        }
+
         // 更新 store
         updateSettings(mergedSettings);
         return mergedSettings;
