@@ -28,6 +28,7 @@ import AISidebar from "./ai-sidebar.svelte";
 import ChatDialog from "./components/ChatDialog.svelte";
 import { updateSettings } from "./stores/settings";
 import { getModelCapabilities } from "./utils/modelCapabilities";
+import { matchHotKey } from "./utils/hotkey";
 
 export const SETTINGS_FILE = "settings.json";
 
@@ -133,6 +134,7 @@ export default class PluginSample extends Plugin {
                 element.style.display = 'flex';
                 element.style.flexDirection = 'column';
                 element.style.height = '100%';
+                element.tabIndex = 0; // 允许元素获取焦点以接收键盘事件
 
                 // 从 this.data 中获取 app 信息
                 const app = this.data?.app;
@@ -142,6 +144,41 @@ export default class PluginSample extends Plugin {
                     container.className = 'fn__flex-1 fn__flex-column';
                     container.style.height = '100%';
                     container.style.width = '100%';
+                    container.style.position = 'relative';
+                    container.style.transition = 'all 0.3s ease';
+                    container.tabIndex = 0; // 允许容器获取焦点
+
+                    // 创建浮动工具栏
+                    const toolbar = document.createElement('div');
+                    toolbar.style.position = 'absolute';
+                    toolbar.style.top = '8px';
+                    toolbar.style.right = '8px';
+                    toolbar.style.zIndex = '1000';
+                    toolbar.style.display = 'flex';
+                    toolbar.style.gap = '4px';
+                    toolbar.style.padding = '4px';
+                    toolbar.style.background = 'var(--b3-theme-surface)';
+                    toolbar.style.borderRadius = '4px';
+                    toolbar.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                    toolbar.style.opacity = '0';
+                    toolbar.style.transition = 'opacity 0.2s ease';
+
+                    // 全屏按钮
+                    const fullscreenBtn = document.createElement('button');
+                    fullscreenBtn.className = 'b3-button b3-button--text';
+                    fullscreenBtn.title = '全屏 (Alt+Y)';
+                    fullscreenBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconFullscreen"></use></svg>';
+                    toolbar.appendChild(fullscreenBtn);
+
+                    container.appendChild(toolbar);
+
+                    // 鼠标移入显示工具栏
+                    container.addEventListener('mouseenter', () => {
+                        toolbar.style.opacity = '1';
+                    });
+                    container.addEventListener('mouseleave', () => {
+                        toolbar.style.opacity = '0';
+                    });
 
                     // 创建 webview 元素
                     const webview = document.createElement('webview') as any;
@@ -152,13 +189,136 @@ export default class PluginSample extends Plugin {
 
                     container.appendChild(webview);
                     element.appendChild(container);
+
+                    // 全屏状态标志
+                    let isFullscreen = false;
+
+                    // 切换全屏函数
+                    const toggleFullscreen = () => {
+                        isFullscreen = !isFullscreen;
+
+                        if (isFullscreen) {
+                            // 进入全屏
+                            container.style.position = 'fixed';
+                            container.style.top = '0';
+                            container.style.left = '0';
+                            container.style.right = '0';
+                            container.style.bottom = '0';
+                            container.style.width = '100vw';
+                            container.style.height = '100vh';
+                            container.style.zIndex = '9999';
+                            container.style.background = 'var(--b3-theme-background)';
+                            fullscreenBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconContract"></use></svg>';
+                            fullscreenBtn.title = '退出全屏 (Esc 或 Alt+Y)';
+                            toolbar.style.opacity = '1'; // 全屏时始终显示工具栏
+                        } else {
+                            // 退出全屏
+                            container.style.position = 'relative';
+                            container.style.top = '';
+                            container.style.left = '';
+                            container.style.right = '';
+                            container.style.bottom = '';
+                            container.style.width = '100%';
+                            container.style.height = '100%';
+                            container.style.zIndex = '';
+                            container.style.background = '';
+                            fullscreenBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconFullscreen"></use></svg>';
+                            fullscreenBtn.title = '全屏 (Alt+Y)';
+                        }
+                    };
+
+                    // 全屏按钮点击事件
+                    fullscreenBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleFullscreen();
+                    });
+
+                    // 键盘事件处理
+                    const handleKeydown = (e: KeyboardEvent) => {
+                        // Alt+Y 切换全屏
+                        if (matchHotKey(window.siyuan.config.keymap.editor.general.fullscreen, e)) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleFullscreen();
+                            return;
+                        }
+
+                        // Esc 退出全屏
+                        if (isFullscreen && e.key === 'Escape') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isFullscreen) {
+                                toggleFullscreen();
+                            }
+                        }
+                    };
+
+                    // 在多个层级添加键盘事件监听，确保能捕获
+                    element.addEventListener('keydown', handleKeydown, true); // 使用 capture 阶段
+                    container.addEventListener('keydown', handleKeydown, true);
+                    document.addEventListener('keydown', handleKeydown, true);
+                    window.addEventListener('keydown', handleKeydown, true);
+
+                    // 尝试在 webview 加载完成后注入键盘监听
+                    webview.addEventListener('dom-ready', () => {
+                        try {
+                            // 注入脚本来监听 webview 内部的键盘事件
+                            const script = `
+                                (function() {
+                                    document.addEventListener('keydown', function(e) {
+                                        // Alt+Y
+                                        if (e.altKey && e.key.toLowerCase() === 'y') {
+                                            e.preventDefault();
+                                            // 通过 postMessage 发送到外部
+                                            window.parent.postMessage({ type: 'webapp-hotkey', key: 'alt-y' }, '*');
+                                        }
+                                        // Esc
+                                        if (e.key === 'Escape') {
+                                            e.preventDefault();
+                                            window.parent.postMessage({ type: 'webapp-hotkey', key: 'escape' }, '*');
+                                        }
+                                    }, true);
+                                })();
+                            `;
+                            webview.executeJavaScript(script);
+                        } catch (err) {
+                            console.warn('无法注入键盘监听脚本:', err);
+                        }
+                    });
+
+                    // 监听来自 webview 的消息
+                    const handleMessage = (event: MessageEvent) => {
+                        if (event.data?.type === 'webapp-hotkey') {
+                            if (event.data.key === 'alt-y') {
+                                toggleFullscreen();
+                            } else if (event.data.key === 'escape' && isFullscreen) {
+                                toggleFullscreen();
+                            }
+                        }
+                    };
+                    window.addEventListener('message', handleMessage);
+
+                    // 保存清理函数到 element 上，以便在 destroy 时调用
+                    (element as any)._cleanupKeydownHandler = () => {
+                        element.removeEventListener('keydown', handleKeydown, true);
+                        container.removeEventListener('keydown', handleKeydown, true);
+                        document.removeEventListener('keydown', handleKeydown, true);
+                        window.removeEventListener('keydown', handleKeydown, true);
+                        window.removeEventListener('message', handleMessage);
+                    };
                 }
             },
             beforeDestroy() {
                 console.log('before destroy:', this.data);
             },
             destroy() {
-                // 清理代码
+                // 清理键盘事件监听器
+                const element = this.element as any;
+                if (element._cleanupKeydownHandler) {
+                    element._cleanupKeydownHandler();
+                    delete element._cleanupKeydownHandler;
+                }
             }
         });
 
