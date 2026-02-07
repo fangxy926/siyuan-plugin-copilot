@@ -797,6 +797,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                 id: plugin.name + WEBAPP_TAB_TYPE,
                 data: {
                     app: app,
+                    time: Date.now(), // 添加时间戳，确保每次点击都能打开新标签页
                 },
             },
         });
@@ -14046,7 +14047,6 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
         border-bottom: 1px solid var(--b3-border-color);
         position: sticky;
         top: 0;
-        z-index: 10;
         background: var(--b3-theme-background);
     }
 
@@ -14384,7 +14384,6 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
         -ms-overflow-style: none;
         position: sticky;
         top: 0;
-        z-index: 10;
         background: var(--b3-theme-surface);
 
         &::-webkit-scrollbar {
