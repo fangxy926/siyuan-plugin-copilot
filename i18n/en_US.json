@@ -9,6 +9,7 @@
             "displayAndOperation": "Display & Operation",
             "noteExport": "Chat Export",
             "sessionManagement": "Session Management",
+            "translate": "Translation Settings",
             "group1": "Tab1",
             "group2": "Tab2",
             "reset": "Reset Settings"
@@ -136,6 +137,17 @@
             "promptTitle": "Custom Prompt",
             "promptDescription": "Customize the prompt for generating session titles. Use {message} as a placeholder for the user message",
             "promptPlaceholder": "Generate a concise session title (max 20 characters, no quotes) based on the following user message:\n\n{message}"
+        },
+        "translate": {
+            "temperature": {
+                "title": "Translation Temperature",
+                "description": "Temperature parameter for translation (0-2). Leave empty to use model default. Lower values make translation more accurate and consistent; higher values make it more flexible and diverse"
+            },
+            "prompt": {
+                "title": "Translation Prompt",
+                "description": "Prompt template for translation, ${content} will be replaced with the content to translate",
+                "placeholder": "Enter translation prompt template..."
+            }
         }
     },
     "aiSidebar": {
@@ -205,6 +217,27 @@
             "viewDiff": "View Diff",
             "applied": "Applied",
             "rejected": "Rejected"
+        },
+        "translate": {
+            "title": "Translation",
+            "openDialog": "Open Translation Dialog",
+            "inputLanguage": "Input Language",
+            "outputLanguage": "Output Language",
+            "inputText": "Input Text",
+            "outputText": "Translation Result",
+            "inputPlaceholder": "Enter text to translate...",
+            "outputPlaceholder": "Translation result will appear here...",
+            "auto": "Auto Detect",
+            "swap": "Swap Languages",
+            "translate": "Translate",
+            "clear": "Clear",
+            "cancel": "Cancel",
+            "history": "Translation History",
+            "noHistory": "No translation history",
+            "emptyInput": "Please enter text to translate",
+            "noModel": "Please select a translation model",
+            "noConfig": "Model configuration not found",
+            "error": "Translation failed"
         },
         "modelSettings": {
             "title": "Model Settings",

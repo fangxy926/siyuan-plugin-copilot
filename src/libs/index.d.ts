@@ -19,6 +19,11 @@ interface ISettingItemCore {
         max: number;
         step: number;
     };
+    number?: {
+        min: number;
+        max: number;
+        step: number;
+    };
     options?: { [key: string | number]: string };
     button?: {
         label: string;

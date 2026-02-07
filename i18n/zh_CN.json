@@ -9,6 +9,7 @@
             "displayAndOperation": "显示与操作",
             "noteExport": "对话导出",
             "sessionManagement": "会话管理",
+            "translate": "翻译设置",
             "group1": "页签1",
             "group2": "页签2",
             "reset": "重置设置"
@@ -135,6 +136,17 @@
             "promptTitle": "自定义提示词",
             "promptDescription": "自定义生成会话标题的提示词，使用 {message} 作为用户消息的占位符",
             "promptPlaceholder": "请根据以下用户消息生成一个简洁的会话标题（不超过20个字，不要使用引号）：\n\n{message}"
+        },
+        "translate": {
+            "temperature": {
+                "title": "翻译 Temperature",
+                "description": "翻译专用的 temperature 参数（0-2），为空则使用模型默认值。值越小，翻译越准确一致；值越大，翻译越灵活多样"
+            },
+            "prompt": {
+                "title": "翻译提示词",
+                "description": "翻译时使用的提示词模板，${content} 会被替换为要翻译的内容",
+                "placeholder": "输入翻译提示词模板..."
+            }
         }
     },
     "aiSidebar": {
@@ -204,6 +216,27 @@
             "viewDiff": "查看差异",
             "applied": "已应用",
             "rejected": "已拒绝"
+        },
+        "translate": {
+            "title": "翻译",
+            "openDialog": "打开翻译对话框",
+            "inputLanguage": "输入语言",
+            "outputLanguage": "输出语言",
+            "inputText": "输入文本",
+            "outputText": "翻译结果",
+            "inputPlaceholder": "请输入要翻译的文本...",
+            "outputPlaceholder": "翻译结果将显示在这里...",
+            "auto": "自动检测",
+            "swap": "交换语言",
+            "translate": "翻译",
+            "clear": "清空",
+            "cancel": "取消",
+            "history": "翻译历史",
+            "noHistory": "暂无翻译历史",
+            "emptyInput": "请输入要翻译的文本",
+            "noModel": "请选择翻译模型",
+            "noConfig": "未找到模型配置",
+            "error": "翻译失败"
         },
         "modelSettings": {
             "title": "预设设置",
