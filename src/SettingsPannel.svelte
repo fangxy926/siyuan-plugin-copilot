@@ -329,7 +329,9 @@
                     value: settings.translateTemperature,
                     type: 'number',
                     title: t('settings.translate.temperature.title') || '翻译 Temperature',
-                    description: t('settings.translate.temperature.description') || '翻译专用的 temperature 参数（0-2），为空则使用模型默认值。值越小，翻译越准确一致；值越大，翻译越灵活多样',
+                    description:
+                        t('settings.translate.temperature.description') ||
+                        '翻译专用的 temperature 参数（0-2），为空则使用模型默认值。值越小，翻译越准确一致；值越大，翻译越灵活多样',
                     number: {
                         min: 0,
                         max: 2,
@@ -341,10 +343,13 @@
                     value: settings.translatePrompt,
                     type: 'textarea',
                     title: t('settings.translate.prompt.title') || '翻译提示词',
-                    description: t('settings.translate.prompt.description') || '翻译时使用的提示词模板，${content} 会被替换为要翻译的内容',
+                    description:
+                        t('settings.translate.prompt.description') ||
+                        '翻译时使用的提示词模板，${content} 会被替换为要翻译的内容',
                     direction: 'row',
                     rows: 8,
-                    placeholder: t('settings.translate.prompt.placeholder') || '输入翻译提示词模板...',
+                    placeholder:
+                        t('settings.translate.prompt.placeholder') || '输入翻译提示词模板...',
                 },
             ],
         },
