@@ -23,7 +23,7 @@ import "@/index.scss";
 
 import SettingPanel from "./SettingsPannel.svelte";
 import { getDefaultSettings } from "./defaultSettings";
-import { setPluginInstance, t } from "./utils/i18n";
+import { setPluginInstance, t, getCurrentLanguage } from "./utils/i18n";
 import AISidebar from "./ai-sidebar.svelte";
 import ChatDialog from "./components/ChatDialog.svelte";
 import { updateSettings } from "./stores/settings";
@@ -144,62 +144,7 @@ export default class PluginSample extends Plugin {
             .slice(0, 10);
     }
 
-    /**
-     * 初始化 WebView Session 配置
-     * 设置 User-Agent 和请求拦截，解决 Google 等网站的登录问题
-     */
-    private initWebViewSession() {
-        try {
-            // 检查是否可以访问 require
-            if (typeof (window as any).require !== 'function') {
-                console.warn('[WebApp Session] 当前环境不支持 require，无法配置 session，将仅在 webview 层面设置 UA');
-                return;
-            }
 
-            // 尝试访问 Electron 的 session API
-            const { session } = (window as any).require('electron');
-            if (!session) {
-                console.warn('[WebApp Session] 无法加载 Electron session 模块');
-                return;
-            }
-
-            const partitionName = 'persist:siyuan-copilot-webapp-shared';
-            const webSession = session.fromPartition(partitionName);
-
-            // 获取原始 User-Agent
-            const originUA = webSession.getUserAgent();
-
-            // 生成清理后的 User-Agent（移除 Electron 等标识）
-            let cleanUA = originUA
-                .replace(/Electron\/\S+\s?/gi, '')
-                .replace(/SiYuan\/\S+\s?/gi, '')
-                .replace(/\s+/g, ' ')
-                .trim();
-
-            // 如果清理后的 UA 为空或太短，使用标准的 Chrome UA
-            if (!cleanUA || cleanUA.length < 50) {
-                cleanUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-            }
-
-
-            // 设置默认 User-Agent
-            webSession.setUserAgent(cleanUA);
-
-            // 拦截请求头，对 Google 使用原始 UA，其他网站使用清理后的 UA
-            webSession.webRequest.onBeforeSendHeaders((details: any, callback: any) => {
-                const isGoogle = details.url.includes('google.com') || details.url.includes('googleapis.com') || details.url.includes('gstatic.com') || details.url.includes('github.com');
-                const headers = {
-                    ...details.requestHeaders,
-                    'User-Agent': isGoogle ? originUA : cleanUA,
-                    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-US;q=0.7'
-                };
-                callback({ requestHeaders: headers });
-            });
-
-        } catch (error) {
-            console.warn('[WebApp Session] Session 初始化失败，将仅在 webview 层面设置 UA:', error);
-        }
-    }
 
     /**
      * 注册小程序图标
@@ -360,8 +305,7 @@ export default class PluginSample extends Plugin {
         // 设置i18n插件实例
         setPluginInstance(this);
 
-        // 初始化 WebView Session 配置
-        this.initWebViewSession();
+
 
         // 加载历史记录
         this.webViewHistory = await this.loadWebViewHistory();
@@ -756,19 +700,46 @@ export default class PluginSample extends Plugin {
                     webview.style.height = '100%';
                     webview.style.border = 'none';
 
-                    // 生成干净的 User-Agent（移除 Electron 等标识）
-                    const generateCleanUserAgent = () => {
-                        // 获取当前的 User-Agent
-                        const originUA = navigator.userAgent;
-                        // 移除 Electron 和相关标识，使其看起来像普通的 Chrome 浏览器
+                    // 生成干净的 User-Agent（移除 Electron、SiYuan 及其相关 URL 标记）
+                    const generateCleanUserAgent = (url: string) => {
+                        const originUA = navigator.userAgent || '';
+
+                        // 对于 Google 域名，直接返回原始 UA，不进行清理
+                        // Google 的服务可能对 User-Agent 有特殊检测机制，保留原始 UA 可以避免兼容性问题
+                        try {
+                            const urlObj = new URL(url);
+                            if (urlObj.hostname.includes('google.com') || urlObj.hostname.includes('google.')) {
+                                return originUA;
+                            }
+                        } catch (e) {
+                            // URL 解析失败，继续清理流程
+                        }
+
+                        // 目标：清理任何形式的 SiYuan 标识（例如 "SiYuan/3.5.4"、"SiYuan 3.5.4"、以及伴随的 URL 如 https://b3log.org/siyuan）
+                        // 同时移除 Electron 标识，但保留 Mozilla/5.0
                         let cleanUA = originUA
-                            .replace(/Electron\/\S+\s?/gi, '')
-                            .replace(/SiYuan\/\S+\s?/gi, '')
+                            // 移除 SiYuan/xxx
+                            .replace(/SiYuan\/[0-9A-Za-z.\-]+\s*/gi, '')
+                            // 移除独立的 SiYuan 词（带或不带版本号）
+                            .replace(/\bSiYuan\b\s*[0-9A-Za-z.\-]*\s*/gi, '')
+                            // 移除 SiYuan 相关的 URL（如 b3log.org/siyuan）
+                            .replace(/https?:\/\/[^\s]*b3log\.org[^\s]*/gi, '')
+                            .replace(/https?:\/\/[^\s]*siyuan[^\s]*/gi, '')
+                            // 移除 Electron/xxx
+                            .replace(/Electron\/\S+\s*/gi, '')
+                            // 移除独立的 Electron 词（但保留 Mozilla/5.0 和其他正常内容）
+                            .replace(/\bElectron\b\s*/gi, '')
+                            // 合并多余空白并修剪
                             .replace(/\s+/g, ' ')
                             .trim();
 
-                        // 如果清理后的 UA 为空或太短，使用标准的 Chrome UA
-                        if (!cleanUA || cleanUA.length < 50) {
+                        // 确保 UA 以 Mozilla/5.0 开头（标准浏览器 UA 格式）
+                        if (!cleanUA.startsWith('Mozilla/5.0')) {
+                            cleanUA = 'Mozilla/5.0 ' + cleanUA;
+                        }
+
+                        // 如果清理后的 UA 仍然异常（太短或缺少关键标识），回退为标准 Chrome UA
+                        if (cleanUA.length < 50 || !/Chrome\//i.test(cleanUA)) {
                             cleanUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
                         }
 
@@ -778,19 +749,28 @@ export default class PluginSample extends Plugin {
 
                     // 配置 webview 属性（必须在设置 src 之前设置 partition）
                     webview.setAttribute('allowpopups', 'true');
+
+
                     // 所有 webapp 使用同一个 partition，这样可以在不同标签页和跨域导航时共享登录状态
                     // 这解决了在一个标签页登录后，新标签页或跨域跳转时需要重新登录的问题
                     const partitionName = 'persist:siyuan-copilot-webapp-shared';
                     webview.setAttribute('partition', partitionName);
-                    // 禁用 node integration 以提高安全性
-                    webview.setAttribute('nodeintegration', 'false');
+
                     // 设置清理后的 User-Agent，移除 Electron 标识以避免被网站检测和限制
-                    const userAgent = generateCleanUserAgent();
+                    // 对于 Google 域名保留原始 UA，避免兼容性问题
+                    const userAgent = generateCleanUserAgent(app.url);
                     webview.setAttribute('useragent', userAgent);
-                    // 设置 webpreferences，启用现代 Web 功能
-                    // contextIsolation=yes: 启用上下文隔离以提高安全性
-                    // webSecurity=yes: 启用 Web 安全策略
-                    webview.setAttribute('webpreferences', 'contextIsolation=yes, webSecurity=yes');
+
+                    // 设置 Accept-Language，使 webview 请求携带插件当前语言优先级
+                    try {
+                        const rawLang = getCurrentLanguage?.() || '';
+                        const language = rawLang.replace(/_/g, '-') || 'en';
+                        // 格式: Accept-Language: <language>, en;q=0.9, *;q=0.5
+                        webview.setAttribute('accept-language', `${language}, en;q=0.9, *;q=0.5`);
+                    } catch (e) {
+                        console.warn('设置 Accept-Language 失败:', e);
+                    }
+
 
                     // 最后设置 src，因为 partition 等属性必须在加载 URL 之前设置
                     webview.src = app.url;
