@@ -2526,6 +2526,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
         contextDocuments = [];
         isLoading = true;
         isWaitingForAnswerSelection = true;
+        selectedAnswerIndex = null; // 重置选择的答案索引，因为这是新的多模型对话
         hasUnsavedChanges = true;
         autoScroll = true;
         isAborted = false; // 重置中断标志
@@ -9390,6 +9391,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                                             </button>
                                                             <button
                                                                 class="b3-button b3-button--primary ai-sidebar__multi-model-select-btn"
+                                                                class:ai-sidebar__multi-model-select-btn--selected={response.isSelected}
                                                                 on:click={() =>
                                                                     selectHistoryMultiModelAnswer(
                                                                         messageIndex + msgIndex,
@@ -10202,6 +10204,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                             </button>
                                             <button
                                                 class="b3-button b3-button--primary ai-sidebar__multi-model-select-btn"
+                                                class:ai-sidebar__multi-model-select-btn--selected={selectedAnswerIndex === index}
                                                 on:click={() => selectMultiModelAnswer(index)}
                                             >
                                                 {selectedAnswerIndex === index
@@ -10376,6 +10379,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                                 </button>
                                                 <button
                                                     class="b3-button b3-button--primary ai-sidebar__multi-model-select-btn"
+                                                    class:ai-sidebar__multi-model-select-btn--selected={selectedAnswerIndex === selectedTabIndex}
                                                     on:click={() =>
                                                         selectMultiModelAnswer(selectedTabIndex)}
                                                 >
@@ -14164,6 +14168,12 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
         height: auto;
         white-space: nowrap;
     }
+
+    .ai-sidebar__multi-model-select-btn--selected {
+        background-color: var(--b3-theme-success) !important;
+        border-color: var(--b3-theme-success) !important;
+    }
+
 
     .ai-sidebar__multi-model-card-content {
         flex: 1;
