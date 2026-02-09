@@ -779,6 +779,29 @@ export default class PluginSample extends Plugin {
                     fullscreenBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconFullscreen"></use></svg>';
                     navbar.appendChild(fullscreenBtn);
 
+                    // 打开开发者工具按钮
+                    const devtoolsBtn = document.createElement('button');
+                    devtoolsBtn.className = 'b3-button b3-button--text';
+                    devtoolsBtn.title = '打开开发者工具';
+                    devtoolsBtn.textContent = 'DevTools';
+                    devtoolsBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try {
+                            if (webview && typeof webview.openDevTools === 'function') {
+                                webview.openDevTools();
+                            } else if (webview && typeof (webview.getWebContents) === 'function') {
+                                const wc = webview.getWebContents();
+                                if (wc && typeof wc.openDevTools === 'function') wc.openDevTools();
+                            } else {
+                                console.warn('webview.openDevTools not available in this environment.');
+                            }
+                        } catch (err) {
+                            console.warn('打开开发者工具失败:', err);
+                        }
+                    });
+                    navbar.appendChild(devtoolsBtn);
+
                     container.appendChild(navbar);
 
                     // 创建 webview 容器包装
