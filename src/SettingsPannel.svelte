@@ -333,6 +333,17 @@
                         t('settings.openLinksInWebView.description') ||
                         '点击思源笔记中的 https 链接时，在内置 WebView 标签页中打开，而不是外部浏览器',
                 },
+                {
+                    key: 'searchEngine',
+                    value: settings.searchEngine,
+                    type: 'select',
+                    title: t('settings.searchEngine.title') || '搜索引擎',
+                    description: t('settings.searchEngine.description') || '选择地址栏使用的默认搜索引擎',
+                    options: {
+                        google: 'Google',
+                        bing: 'Bing',
+                    },
+                },
             ],
         },
         {

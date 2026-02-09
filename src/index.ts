@@ -26,7 +26,7 @@ import { getDefaultSettings } from "./defaultSettings";
 import { setPluginInstance, t, getCurrentLanguage } from "./utils/i18n";
 import AISidebar from "./ai-sidebar.svelte";
 import ChatDialog from "./components/ChatDialog.svelte";
-import { updateSettings } from "./stores/settings";
+import { updateSettings, getSettings } from "./stores/settings";
 import { getModelCapabilities } from "./utils/modelCapabilities";
 import { matchHotKey, getCustomHotKey } from "./utils/hotkey";
 
@@ -205,6 +205,19 @@ export default class PluginSample extends Plugin {
         } catch (e) {
             return '';
         }
+    }
+
+    // 判断输入是否很可能是一个 URL（支持不带协议的域名如 example.com）
+    private isLikelyUrl(input: string): boolean {
+        if (!input) return false;
+        const s = input.trim();
+        // 含空格的通常不是 URL，例如搜索词
+        if (s.indexOf(' ') >= 0) return false;
+        // 以协议开头明显是 URL
+        if (/^[a-zA-Z][a-zA-Z0-9+-.]*:\/\//.test(s)) return true;
+        // 包含点号且不以@开头(排除邮箱)，通常是域名或网址
+        if (/\./.test(s) && !/^@/.test(s)) return true;
+        return false;
     }
 
     // 依次尝试多个 favicon 源，遇到第一个成功的就返回 data:image...
@@ -715,35 +728,58 @@ export default class PluginSample extends Plugin {
                                 })();
                                 urlInput.blur();
                             } else {
-                                // 否则使用输入的内容
-                                let url = urlInput.value.trim();
-                                if (url) {
-                                    if (!/^https?:\/\//i.test(url)) {
-                                        url = 'https://' + url;
-                                    }
-                                    suggestionList.style.display = 'none';
-                                    redirectCount = 0;
-                                    lastUrl = url;
-                                    webview.src = url;
-                                    // 更新标签图标
-                                    (async () => {
-                                        try {
-                                            const iconId = await pluginInstance.getOrCreateIconForDomain(url);
-                                            try { if (this.tab) (this.tab as any).icon = iconId; } catch (e) { }
-                                            try {
-                                                const headers = document.querySelectorAll('li[data-type="tab-header"]');
-                                                for (const h of Array.from(headers)) {
-                                                    const textEl = h.querySelector('.item__text');
-                                                    if (textEl && textEl.textContent && textEl.textContent.indexOf(initialTitle) !== -1) {
-                                                        const useEl = h.querySelector('svg use');
-                                                        if (useEl) useEl.setAttribute('xlink:href', `#${iconId}`);
-                                                        break;
+                                // 否则使用输入的内容：如果看起来不是网址，则使用 Google 搜索
+                                const raw = urlInput.value.trim();
+                                if (raw) {
+                                    let targetUrl = '';
+
+                                    if (pluginInstance.isLikelyUrl(raw)) {
+                                        // 把可能的域名或网址补全协议
+                                        targetUrl = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
+                                    } else {
+                                                // 作为搜索关键词，使用用户设置的搜索引擎
+                                                getSettings().then((s: any) => {
+                                                    const engine = (s && s.searchEngine) ? s.searchEngine : 'google';
+                                                    if (engine === 'bing') {
+                                                        targetUrl = 'https://www.bing.com/search?q=' + encodeURIComponent(raw);
+                                                    } else {
+                                                        targetUrl = 'https://www.google.com/search?q=' + encodeURIComponent(raw);
                                                     }
-                                                }
-                                            } catch (e) { }
-                                        } catch (e) { }
-                                    })();
-                                    urlInput.blur();
+
+                                                    suggestionList.style.display = 'none';
+                                                    redirectCount = 0;
+                                                    lastUrl = targetUrl;
+                                                    webview.src = targetUrl;
+
+                                                    // 更新标签图标（对搜索结果使用默认或尝试抓取）
+                                                    (async () => {
+                                                        try {
+                                                            const iconId = await pluginInstance.getOrCreateIconForDomain(targetUrl);
+                                                            try { if (this.tab) (this.tab as any).icon = iconId; } catch (e) { }
+                                                            try {
+                                                                const headers = document.querySelectorAll('li[data-type="tab-header"]');
+                                                                for (const h of Array.from(headers)) {
+                                                                    const textEl = h.querySelector('.item__text');
+                                                                    if (textEl && textEl.textContent && textEl.textContent.indexOf(initialTitle) !== -1) {
+                                                                        const useEl = h.querySelector('svg use');
+                                                                        if (useEl) useEl.setAttribute('xlink:href', `#${iconId}`);
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            } catch (e) { }
+                                                        } catch (e) { }
+                                                    })();
+                                                    urlInput.blur();
+                                                }).catch(() => {
+                                                    // 回退到 Google
+                                                    targetUrl = 'https://www.google.com/search?q=' + encodeURIComponent(raw);
+                                                    suggestionList.style.display = 'none';
+                                                    redirectCount = 0;
+                                                    lastUrl = targetUrl;
+                                                    webview.src = targetUrl;
+                                                    urlInput.blur();
+                                                });
+                                            }
                                 }
                             }
                         } else if (e.key === 'Escape') {

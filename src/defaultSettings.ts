@@ -83,6 +83,8 @@ export const getDefaultSettings = () => ({
 
     // 操作设置
     sendMessageShortcut: 'ctrl+enter' as 'ctrl+enter' | 'enter', // 发送消息的快捷键
+    // 搜索引擎选择，支持 'google' 或 'bing'
+    searchEngine: 'google' as 'google' | 'bing',
 
     // 显示设置
     messageFontSize: 14 as number, // 消息字体大小
