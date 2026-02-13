@@ -1918,7 +1918,7 @@ export default class PluginSample extends Plugin {
             if (settings.dataTransfer.autoSetModelCapabilities) {
             } else if (settings.aiProviders) {
                 // 内置平台列表
-                const builtInProviders = ['Achuan', 'gemini', 'deepseek', 'openai', 'moonshot', 'volcano'];
+                const builtInProviders = ['Achuan', 'gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'zhipu'];
 
                 // 处理内置平台
                 for (const providerId of builtInProviders) {

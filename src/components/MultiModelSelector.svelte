@@ -33,6 +33,7 @@
         openai: t('platform.builtIn.openai'),
         volcano: t('platform.builtIn.volcano'),
         moonshot: t('platform.builtIn.moonshot'),
+        zhipu: t('platform.builtIn.zhipu'),
     };
 
     let expandedProviders: Set<string> = new Set();

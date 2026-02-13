@@ -74,6 +74,11 @@ export const getDefaultSettings = () => ({
             customApiUrl: '',
             models: []
         },
+        zhipu: {
+            apiKey: '',
+            customApiUrl: '',
+            models: []
+        },
         customProviders: [] as CustomProviderConfig[]
     } as Record<string, any>,
     selectedProviderId: 'openai' as string,  // 设置面板中选中的平台

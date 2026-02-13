@@ -28,6 +28,7 @@
         deepseek: t('platform.builtIn.deepseek'),
         moonshot: t('platform.builtIn.moonshot'),
         volcano: t('platform.builtIn.volcano'),
+        zhipu: t('platform.builtIn.zhipu'),
     };
 
     // 内置平台的默认 API 地址
@@ -38,6 +39,7 @@
         moonshot: 'https://api.moonshot.cn',
         openai: 'https://api.openai.com',
         volcano: 'https://ark.cn-beijing.volces.com',
+        zhipu: 'https://open.bigmodel.cn/api/paas/v4',
     };
 
     // 内置平台的官网链接
@@ -48,6 +50,7 @@
         moonshot: 'https://platform.moonshot.cn/',
         openai: 'https://platform.openai.com/',
         volcano: 'https://console.volcengine.com/ark',
+        zhipu: 'https://open.bigmodel.cn/',
     };
 
     // 当前选中的平台ID
@@ -479,6 +482,7 @@
                 moonshot: { apiKey: '', customApiUrl: '', models: [] },
                 volcano: { apiKey: '', customApiUrl: '', models: [] },
                 Achuan: { apiKey: '', customApiUrl: '', models: [] },
+                zhipu: { apiKey: '', customApiUrl: '', models: [] },
                 customProviders: [],
             };
         }
@@ -491,6 +495,7 @@
             'openai',
             'moonshot',
             'volcano',
+            'zhipu',
         ];
         for (const platformId of builtInPlatformIds) {
             if (!settings.aiProviders[platformId]) {
