@@ -34,6 +34,7 @@
         volcano: t('platform.builtIn.volcano'),
         moonshot: t('platform.builtIn.moonshot'),
         zhipu: t('platform.builtIn.zhipu'),
+        minimax: t('platform.builtIn.minimax'),
     };
 
     let expandedProviders: Set<string> = new Set();

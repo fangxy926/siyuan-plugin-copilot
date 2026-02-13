@@ -29,6 +29,7 @@
         moonshot: t('platform.builtIn.moonshot'),
         volcano: t('platform.builtIn.volcano'),
         zhipu: t('platform.builtIn.zhipu'),
+        minimax: t('platform.builtIn.minimax'),
     };
 
     // 内置平台的默认 API 地址
@@ -40,6 +41,7 @@
         openai: 'https://api.openai.com',
         volcano: 'https://ark.cn-beijing.volces.com',
         zhipu: 'https://open.bigmodel.cn/api/paas/v4',
+        minimax: 'https://api.minimaxi.com/v1',
     };
 
     // 内置平台的官网链接
@@ -51,6 +53,7 @@
         openai: 'https://platform.openai.com/',
         volcano: 'https://console.volcengine.com/ark',
         zhipu: 'https://open.bigmodel.cn/',
+        minimax: 'https://platform.minimaxi.com/',
     };
 
     // 当前选中的平台ID
@@ -483,6 +486,7 @@
                 volcano: { apiKey: '', customApiUrl: '', models: [] },
                 Achuan: { apiKey: '', customApiUrl: '', models: [] },
                 zhipu: { apiKey: '', customApiUrl: '', models: [] },
+                minimax: { apiKey: '', customApiUrl: '', models: [] },
                 customProviders: [],
             };
         }
@@ -496,6 +500,7 @@
             'moonshot',
             'volcano',
             'zhipu',
+            'minimax',
         ];
         for (const platformId of builtInPlatformIds) {
             if (!settings.aiProviders[platformId]) {
