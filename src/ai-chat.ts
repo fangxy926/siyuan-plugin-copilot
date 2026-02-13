@@ -516,9 +516,10 @@ async function chatOpenAIFormat(
             formatted.content = newContent;
         }
 
-        // 深度思考模式下需要回传的思维链内容（如 DeepSeek reasoning_content）
-        if ((msg as any).reasoning_content) {
-            formatted.reasoning_content = (msg as any).reasoning_content;
+        // 深度思考模式下需要回传的思维链内容（如 DeepSeek/Kimi reasoning_content）
+        // 对于所有 assistant 消息，只要有 reasoning_content 就传递（包括带 tool_calls 的）
+        if (msg.role === 'assistant') {
+            formatted.reasoning_content = (msg as any).reasoning_content || '';
         }
 
         // 添加工具调用信息
@@ -544,6 +545,7 @@ async function chatOpenAIFormat(
         ...options.customBody // 合并自定义参数
     };
 
+
     // 添加工具定义（Agent模式）
     if (options.tools && options.tools.length > 0) {
         requestBody.tools = options.tools;
@@ -552,7 +554,11 @@ async function chatOpenAIFormat(
 
     // 处理思考模式：界面控制优先
     // 如果界面未启用思考模式，删除自定义参数中可能存在的思考模式设置
-    if (!options.enableThinking) {
+    // 注意：Kimi K2.5 在使用工具时需要强制启用 thinking 模式
+    const isKimiK25 = /kimi-k2\.5/i.test(options.model);
+    const needsForcedThinking = isKimiK25 && options.tools && options.tools.length > 0;
+
+    if (!options.enableThinking && !needsForcedThinking) {
         // 删除可能来自自定义参数的思考模式字段
         delete requestBody.thinking;
         delete requestBody.reasoning_effort;
@@ -616,6 +622,19 @@ async function chatOpenAIFormat(
                     }
                 };
             }
+        }
+        // 检查是否是 Kimi K2.5 模型（使用 OpenAI 兼容 API）
+        else if (isKimiK25) {
+            // Kimi K2.5 在使用工具时需要显式启用 thinking 模式
+            // https://platform.moonshot.ai/docs/guide/use-kimi-k2-thinking-model
+            requestBody.extra_body = {
+                ...requestBody.extra_body,
+                thinking: {
+                    type: 'enabled'
+                }
+            };
+            // Kimi K2.5 thinking 模式需要 temperature = 1.0
+            requestBody.temperature = 1.0;
         }
         // 通用的 stream_options（适用于 DeepSeek 等）
         requestBody.stream_options = {
@@ -938,9 +957,12 @@ async function handleStreamResponse(
                             || delta?.reasoning
                             || delta?.thought
                             || delta?.thinking;
-                        if (options.enableThinking && reasoningContent) {
+                        // 捕获 thinking 内容，即使 enableThinking 为 false
+                        // kimi 等模型可能默认返回 thinking 内容，我们需要保留它用于后续请求
+                        if (reasoningContent) {
                             isThinkingPhase = true;
                             thinkingText += reasoningContent;
+                            // 始终调用 onThinkingChunk 来保存 thinking 内容
                             options.onThinkingChunk?.(reasoningContent);
                         }
 

@@ -2866,6 +2866,19 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                     content: msg.content,
                 };
 
+                // 保留 tool_calls 和 tool_call_id（工具调用链必需）
+                if (msg.tool_calls) {
+                    baseMsg.tool_calls = msg.tool_calls;
+                }
+                if (msg.tool_call_id) {
+                    baseMsg.tool_call_id = msg.tool_call_id;
+                    baseMsg.name = msg.name;
+                }
+                // 保留 reasoning_content（kimi 等模型必需）
+                if (msg.role === 'assistant') {
+                    baseMsg.reasoning_content = msg.reasoning_content || '';
+                }
+
                 const isLastMessage = index === array.length - 1;
                 if (
                     !isLastMessage &&
@@ -3557,9 +3570,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                     baseMsg.tool_call_id = msg.tool_call_id;
                     baseMsg.name = msg.name;
                 }
-
-                if (isDeepseekThinkingAgent && msg.reasoning_content) {
-                    baseMsg.reasoning_content = msg.reasoning_content;
+                // 保留 reasoning_content（kimi 等模型必需）
+                if (msg.role === 'assistant') {
+                    baseMsg.reasoning_content = msg.reasoning_content || '';
                 }
 
                 // 只处理历史用户消息的上下文（不是最后一条消息）
@@ -4152,13 +4165,15 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                             reasoningEffort: modelConfig.thinkingEffort || 'low',
                             tools: toolsForAgent,
                             customBody, // 传递自定义参数
-                            onThinkingChunk: enableThinking
-                                ? async (chunk: string) => {
-                                      isThinkingPhase = true;
-                                      streamingThinking += chunk;
-                                      await scrollToBottom();
-                                  }
-                                : undefined,
+                            onThinkingChunk: async (chunk: string) => {
+                                // 始终保存 thinking 内容到 streamingThinking
+                                // kimi 等模型可能默认返回 thinking，需要保留用于后续请求
+                                streamingThinking += chunk;
+                                if (enableThinking) {
+                                    isThinkingPhase = true;
+                                    await scrollToBottom();
+                                }
+                            },
                             onThinkingComplete: enableThinking
                                 ? (thinking: string) => {
                                       isThinkingPhase = false;
@@ -4169,7 +4184,6 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                   }
                                 : undefined,
                             onToolCallComplete: async (toolCalls: ToolCall[]) => {
-                                console.log('Tool calls received:', toolCalls);
                                 receivedToolCalls = true;
 
                                 // 如果是第一次工具调用，创建新的assistant消息
@@ -4180,8 +4194,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                         tool_calls: toolCalls,
                                     };
 
-                                    if (isDeepseekThinkingAgent && streamingThinking) {
-                                        assistantMessage.reasoning_content = streamingThinking;
+                                    // 始终保存 reasoning_content（kimi 等模型默认返回 thinking）
+                                    assistantMessage.reasoning_content = streamingThinking || '';
+                                    if (streamingThinking) {
                                         assistantMessage.thinking = streamingThinking;
                                     }
                                     messages = [...messages, assistantMessage];
@@ -4194,8 +4209,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                         ...toolCalls,
                                     ];
 
-                                    if (isDeepseekThinkingAgent && streamingThinking) {
-                                        existingMessage.reasoning_content = streamingThinking;
+                                    // 始终保存 reasoning_content（kimi 等模型默认返回 thinking）
+                                    existingMessage.reasoning_content = streamingThinking || '';
+                                    if (streamingThinking) {
                                         existingMessage.thinking = streamingThinking;
                                     }
                                     messages = [...messages];
@@ -4298,9 +4314,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                         baseMsg.tool_call_id = msg.tool_call_id;
                                         baseMsg.name = msg.name;
                                     }
-
-                                    if (isDeepseekThinkingAgent && msg.reasoning_content) {
-                                        baseMsg.reasoning_content = msg.reasoning_content;
+                                    // 保留 reasoning_content（kimi 等模型必需）
+                                    if (msg.role === 'assistant') {
+                                        baseMsg.reasoning_content = msg.reasoning_content || '';
                                     }
 
                                     return baseMsg;
@@ -4340,11 +4356,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                         // 将AI的最终回复存储到 finalReply 字段
                                         existingMessage.finalReply = processedContent;
 
-                                        if (isDeepseekThinkingAgent && streamingThinking) {
-                                            existingMessage.reasoning_content = streamingThinking;
-                                        }
-
-                                        // 添加思考内容（如果有）
+                                        // 始终保存 reasoning_content（kimi 等模型默认返回 thinking）
+                                        existingMessage.reasoning_content = streamingThinking || '';
+                                        // 添加思考内容（仅 UI 显示）
                                         if (enableThinking && streamingThinking) {
                                             existingMessage.thinking = streamingThinking;
                                         }
@@ -4357,12 +4371,11 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                             content: convertedText,
                                         };
 
+                                        // 始终保存 reasoning_content（kimi 等模型默认返回 thinking）
+                                        assistantMessage.reasoning_content = streamingThinking || '';
+                                        // 添加思考内容（仅 UI 显示）
                                         if (enableThinking && streamingThinking) {
                                             assistantMessage.thinking = streamingThinking;
-                                            if (isDeepseekThinkingAgent) {
-                                                assistantMessage.reasoning_content =
-                                                    streamingThinking;
-                                            }
                                         }
 
                                         messages = [...messages, assistantMessage];
